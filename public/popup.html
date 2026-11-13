@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Signal</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Signal</h1>
+    <label class="switch"><input type="checkbox" id="enabled"> <span>Enabled</span></label>
+  </header>
+
+  <section>
+    <label>Mode
+      <select id="mode">
+        <option value="review">Review (annotate only, hide nothing)</option>
+        <option value="active">Active (collapse low-quality posts)</option>
+      </select>
+    </label>
+    <label>Sensitivity
+      <select id="sensitivity">
+        <option value="relaxed">Relaxed (only the clearest noise)</option>
+        <option value="balanced">Balanced</option>
+        <option value="strict">Strict (more false positives)</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="highlight"> Highlight standout posts</label>
+  </section>
+
+  <details id="llm">
+    <summary>LLM provider</summary>
+    <label>Preset
+      <select id="preset">
+        <option value="">Custom</option>
+        <option value="https://openrouter.ai/api/v1">OpenRouter</option>
+        <option value="https://api.openai.com/v1">OpenAI</option>
+        <option value="http://localhost:11434/v1">Ollama (local)</option>
+      </select>
+    </label>
+    <label>Endpoint (OpenAI-compatible base URL)<input id="endpoint" type="url" spellcheck="false"></label>
+    <label>Model<input id="model" type="text" spellcheck="false" placeholder="e.g. provider/model-name"></label>
+    <label>API key<input id="apiKey" type="password" autocomplete="off" spellcheck="false"></label>
+    <div class="row">
+      <label>Concurrency<input id="concurrency" type="number" min="1" max="8"></label>
+      <label>Timeout (s)<input id="timeoutS" type="number" min="5" max="120"></label>
+    </div>
+    <div class="row">
+      <label>$/1M input tokens<input id="inputPrice" type="number" min="0" step="any" placeholder="optional"></label>
+      <label>$/1M output tokens<input id="outputPrice" type="number" min="0" step="any" placeholder="optional"></label>
+    </div>
+    <div class="row">
+      <button id="save" type="button">Save</button>
+      <button id="test" type="button">Test connection</button>
+    </div>
+    <p id="llmStatus" role="status"></p>
+  </details>
+
+  <details id="statsBox" open>
+    <summary>This session</summary>
+    <p id="stats"></p>
+  </details>
+
+  <details id="fbBox">
+    <summary>Feedback <span id="fbCount"></span></summary>
+    <ul id="fbList"></ul>
+    <div class="row">
+      <button id="fbExport" type="button">Export labeled JSONL</button>
+      <button id="fbReset" type="button">Reset feedback</button>
+      <button id="cacheReset" type="button">Clear cache</button>
+    </div>
+  </details>
+
+  <script src="popup.js"></script>
+</body>
+</html>

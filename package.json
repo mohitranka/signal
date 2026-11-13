@@ -1,0 +1,22 @@
+{
+  "name": "signal-linkedin-filter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Signal: personal Chrome extension that filters LinkedIn feed noise with a bring-your-own LLM.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "eval": "esbuild eval/run.ts --bundle --platform=node --format=esm --outfile=.eval-build/run.mjs --log-level=warning && node .eval-build/run.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.300",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

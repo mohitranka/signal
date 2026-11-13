@@ -1,0 +1,15 @@
+:root { color-scheme: light dark; }
+body { width: 340px; margin: 0; padding: 12px; font: 13px/1.4 -apple-system, system-ui, sans-serif; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+h1 { font-size: 16px; margin: 0; }
+section, details { margin-bottom: 10px; }
+label { display: block; margin: 6px 0; font-size: 12px; }
+label.check, label.switch { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+input[type=text], input[type=url], input[type=password], input[type=number], select { width: 100%; box-sizing: border-box; padding: 4px 6px; margin-top: 2px; font: inherit; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row label { flex: 1; }
+button { padding: 4px 10px; font: inherit; cursor: pointer; }
+summary { cursor: pointer; font-weight: 600; }
+#llmStatus, #stats { font-size: 12px; margin: 6px 0; white-space: pre-line; }
+#llmStatus.err { color: #c0392b; }
+#fbList { max-height: 140px; overflow: auto; padding-left: 16px; font-size: 12px; }

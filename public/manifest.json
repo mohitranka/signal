@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Signal",
+  "version": "0.1.0",
+  "description": "Keep the insight. Lose the noise. A personal LinkedIn feed filter using your own LLM API key.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.linkedin.com/*"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": { "service_worker": "service-worker.js", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_title": "Signal", "default_popup": "popup.html" }
+}
