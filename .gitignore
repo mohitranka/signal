@@ -3,3 +3,5 @@ dist/
 eval/results/
 *.swp
 .eval-build/
+coverage/
+.forge/
