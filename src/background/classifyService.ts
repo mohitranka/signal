@@ -31,7 +31,7 @@ export class ClassifyService {
     const hit = await this.deps.cache.get(key);
     if (hit) {
       await this.deps.stats.bump({ cacheHits: 1 });
-      return { ok: true, classification: hit, cached: true };
+      return { ok: true, classification: hit, cached: true, model: settings.model, promptVersion: PROMPT_VERSION };
     }
 
     this.queue.setConcurrency(settings.concurrency);
@@ -47,7 +47,7 @@ export class ClassifyService {
         completionTokens: out.completionTokens,
         totalLatencyMs: out.latencyMs,
       });
-      return { ok: true, classification: out.classification, cached: false };
+      return { ok: true, classification: out.classification, cached: false, model: settings.model, promptVersion: PROMPT_VERSION };
     } catch (e) {
       if (e instanceof AbortedError) return { ok: false, kind: 'aborted', message: 'Cancelled.' };
       await this.deps.stats.bump({ failures: 1 });

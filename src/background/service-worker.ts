@@ -1,6 +1,7 @@
 import type { BackgroundMessage } from '../shared/types';
 import { ClassifyService } from './classifyService';
 import { createHandler } from './handlers';
+import { isExtensionPage } from './sender';
 import { CacheStore, FeedbackStore, SettingsStore, StatsStore, chromeKV } from './store';
 
 // Keep the API key and feedback unreachable from content scripts, which share a process with the LinkedIn page.
@@ -31,7 +32,10 @@ const handle = createHandler({
 
 chrome.runtime.onMessage.addListener((msg: BackgroundMessage, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false;
-  handle(msg, sender.tab !== undefined).then(sendResponse, (e: Error) => sendResponse({ error: e.message }));
+  // Trust is decided by who sent it (our own extension page vs. anything else), not by whether it sits in a tab:
+  // popup.html opened as a tab is still our page, and a content script always runs in a web page.
+  const fromContent = !isExtensionPage(sender, chrome.runtime.getURL(''));
+  handle(msg, fromContent).then(sendResponse, (e: Error) => sendResponse({ error: e.message }));
   return true; // async response
 });
 

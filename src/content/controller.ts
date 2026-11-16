@@ -3,7 +3,7 @@ import type { FeedAdapter } from '../adapter/linkedin';
 import { fingerprint, prepareInput } from '../shared/post';
 import type {
   BackgroundMessage,
-  Classification,
+  ClassificationRecord,
   ClassifyResult,
   ErrorKind,
   PageStats,
@@ -31,7 +31,8 @@ interface PostState {
   status: 'new' | 'pending' | 'done' | 'failed' | 'skipped';
   fp?: string;
   input?: PostInput;
-  classification?: Classification;
+  /** The classification shown for this post, with the model and prompt version that produced it. */
+  record?: ClassificationRecord;
   revealed: boolean;
   visible: boolean;
 }
@@ -43,7 +44,7 @@ export class FeedController {
   private settings: PublicSettings | null = null;
   private feedback = new Map<string, Verdict>();
   private posts = new Map<HTMLElement, PostState>();
-  private classified = new Map<string, Classification>();
+  private classified = new Map<string, ClassificationRecord>();
   private inflight = new Map<string, Promise<ClassifyResult>>();
   private observer: MutationObserver | null = null;
   private visibility: ReturnType<NonNullable<ControllerDeps['observeVisible']>> | null = null;
@@ -166,7 +167,7 @@ export class FeedController {
     st.status = 'new';
     delete st.fp;
     delete st.input;
-    delete st.classification;
+    delete st.record;
     st.revealed = false;
   }
 
@@ -207,7 +208,7 @@ export class FeedController {
 
     const known = this.classified.get(fp);
     if (known || this.feedback.has(fp)) {
-      if (known) st.classification = known;
+      if (known) st.record = known;
       st.status = 'done';
       this.render(el);
       return;
@@ -230,8 +231,9 @@ export class FeedController {
     if (!this.stillCurrent(el, st, epoch) || st.fp !== fp) return;
 
     if (result && result.ok) {
-      this.classified.set(fp, result.classification);
-      st.classification = result.classification;
+      const record: ClassificationRecord = { classification: result.classification, model: result.model, promptVersion: result.promptVersion };
+      this.classified.set(fp, record);
+      st.record = record;
       st.status = 'done';
       this.render(el);
       this.renderDuplicates(fp, el);
@@ -261,14 +263,15 @@ export class FeedController {
         revealed: st.revealed,
       };
     }
-    if (!st.classification) return null;
-    const r = decide(st.classification, { sensitivity: this.settings.sensitivity, highlightEnabled: this.settings.highlight });
+    const c = st.record?.classification;
+    if (!c) return null;
+    const r = decide(c, { sensitivity: this.settings.sensitivity, highlightEnabled: this.settings.highlight });
     return {
       outcome: r.outcome,
       source: 'model',
       reason: r.reason,
       modelDecision: r.modelDecision,
-      confidence: st.classification.confidence,
+      confidence: c.confidence,
       review,
       revealed: st.revealed,
     };
@@ -295,7 +298,7 @@ export class FeedController {
   private renderDuplicates(fp: string, except: HTMLElement): void {
     for (const [el, st] of this.posts) {
       if (el !== except && st.fp === fp && st.status !== 'done') {
-        st.classification = this.classified.get(fp);
+        st.record = this.classified.get(fp);
         st.status = 'done';
         this.render(el);
       }
@@ -312,25 +315,37 @@ export class FeedController {
   private giveFeedback(el: HTMLElement, verdict: Verdict | null): void {
     const st = this.posts.get(el);
     if (!st?.fp || !st.input) return;
-    if (verdict === null) this.feedback.delete(st.fp);
-    else this.feedback.set(st.fp, verdict);
     const fp = st.fp;
-    // Same content elsewhere in the feed (reshares) follows the same override immediately.
-    for (const [other, s] of this.posts) {
-      if (s.fp === fp) {
-        s.revealed = false;
-        this.render(other);
-      }
-    }
+    const previous = this.feedback.get(fp) ?? null;
+    this.applyOverride(fp, verdict);
+    const rec = verdict === null ? undefined : st.record;
     void this.d
       .send({
         type: 'setFeedback',
         fp,
         verdict,
         sample: st.input.text,
-        ...(st.classification ? { modelDecision: st.classification.decision, modelConfidence: st.classification.confidence } : {}),
+        ...(rec ? { modelDecision: rec.classification.decision, modelConfidence: rec.classification.confidence, classified: rec } : {}),
+      })
+      .then((r) => {
+        // Not saved (feedback is full): do not show an override that will vanish on reload.
+        if ((r as { error?: string } | undefined)?.error === 'feedback-full' && this.feedback.get(fp) === (verdict ?? undefined)) {
+          this.applyOverride(fp, previous);
+        }
       })
       .catch(() => {});
+  }
+
+  /** Set or clear a local override and re-render every post with this content (reshares follow immediately). */
+  private applyOverride(fp: string, verdict: Verdict | null): void {
+    if (verdict === null) this.feedback.delete(fp);
+    else this.feedback.set(fp, verdict);
+    for (const [other, s] of this.posts) {
+      if (s.fp === fp) {
+        s.revealed = false;
+        this.render(other);
+      }
+    }
   }
 
   private async refreshState(): Promise<void> {

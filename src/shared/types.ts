@@ -21,6 +21,13 @@ export interface Classification {
   signals: Signals;
 }
 
+/** A classification together with what produced it. Feedback keeps one so corrections can be re-scored offline. */
+export interface ClassificationRecord {
+  classification: Classification;
+  model: string;
+  promptVersion: string;
+}
+
 /** Everything about a post that is ever sent to the model. Untrusted third-party text. */
 export interface PostInput {
   text: string;
@@ -60,10 +67,12 @@ export type ErrorKind =
   | 'network'
   | 'server'
   | 'parse'
-  | 'aborted';
+  | 'aborted'
+  /** Rejected by the background: malformed input, or a fingerprint that does not match it. */
+  | 'invalid';
 
 export type ClassifyResult =
-  | { ok: true; classification: Classification; cached: boolean }
+  | { ok: true; classification: Classification; cached: boolean; model: string; promptVersion: string }
   | { ok: false; kind: ErrorKind; message: string };
 
 export type Verdict = 'keep' | 'collapse';
@@ -75,6 +84,8 @@ export interface FeedbackEntry {
   sample: string;
   modelDecision?: Decision;
   modelConfidence?: number;
+  /** The full classification this entry corrected. Absent on entries saved by older versions. */
+  classified?: ClassificationRecord;
 }
 
 export interface Stats {
@@ -100,7 +111,16 @@ export type ContentMessage =
   | { type: 'classify'; fp: string; input: PostInput }
   | { type: 'cancelAll' }
   | { type: 'getState' }
-  | { type: 'setFeedback'; fp: string; verdict: Verdict | null; sample: string; modelDecision?: Decision; modelConfidence?: number };
+  | {
+      type: 'setFeedback';
+      fp: string;
+      verdict: Verdict | null;
+      sample: string;
+      modelDecision?: Decision;
+      modelConfidence?: number;
+      /** Validated by the background before it is stored. */
+      classified?: ClassificationRecord;
+    };
 
 /** popup -> background (extension pages only) */
 export type PopupMessage =

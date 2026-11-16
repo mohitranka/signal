@@ -5,7 +5,7 @@ import { CacheStore, FeedbackStore, SettingsStore, StatsStore } from '../src/bac
 import { decide } from '../src/policy';
 import { DEFAULT_SETTINGS, configProblem, normalizeSettings, toPublic } from '../src/shared/settings';
 import { fingerprint, prepareInput } from '../src/shared/post';
-import { chatResponse, cls, gem, memoryKV, modelJson, noise } from './helpers';
+import { chatResponse, cls, fpFor, gem, memoryKV, modelJson, noise } from './helpers';
 
 describe('decision policy', () => {
   const opts = (sensitivity: 'relaxed' | 'balanced' | 'strict', highlightEnabled = true) => ({ sensitivity, highlightEnabled });
@@ -183,7 +183,7 @@ describe('message handlers', () => {
   it('lets the content script classify and read state, but not change settings or export feedback', async () => {
     const h = harness();
     await h.ready;
-    expect(await h.handle({ type: 'classify', fp: 'a', input: { text: 'x' } }, true)).toMatchObject({ ok: true });
+    expect(await h.handle({ type: 'classify', fp: await fingerprint(prepareInput({ text: 'x' })), input: { text: 'x' } }, true)).toMatchObject({ ok: true });
     for (const msg of [{ type: 'saveSettings', patch: { enabled: false } }, { type: 'testConnection' }, { type: 'listFeedback' }, { type: 'clearFeedback' }, { type: 'getSettings' }] as const) {
       expect(await h.handle(msg, true), msg.type).toEqual({ error: 'forbidden' });
     }
@@ -210,12 +210,12 @@ describe('message handlers', () => {
   it('stores, lists, and resets feedback locally', async () => {
     const h = harness();
     await h.ready;
-    await h.handle({ type: 'setFeedback', fp: 'a', verdict: 'collapse', sample: 'post text', modelDecision: 'keep', modelConfidence: 0.6 }, true);
-    expect(((await h.handle({ type: 'getState' }, true)) as any).feedback).toEqual({ a: 'collapse' });
-    expect(((await h.handle({ type: 'listFeedback' }, false)) as any).a).toMatchObject({ verdict: 'collapse', sample: 'post text', modelDecision: 'keep' });
-    await h.handle({ type: 'setFeedback', fp: 'a', verdict: null, sample: '' }, true);
+    await h.handle({ type: 'setFeedback', fp: fpFor('a'), verdict: 'collapse', sample: 'post text', modelDecision: 'keep', modelConfidence: 0.6 }, true);
+    expect(((await h.handle({ type: 'getState' }, true)) as any).feedback).toEqual({ [fpFor('a')]: 'collapse' });
+    expect(((await h.handle({ type: 'listFeedback' }, false)) as any)[fpFor('a')]).toMatchObject({ verdict: 'collapse', sample: 'post text', modelDecision: 'keep' });
+    await h.handle({ type: 'setFeedback', fp: fpFor('a'), verdict: null, sample: '' }, true);
     expect(((await h.handle({ type: 'getState' }, true)) as any).feedback).toEqual({});
-    await h.handle({ type: 'setFeedback', fp: 'b', verdict: 'keep', sample: 's' }, true);
+    await h.handle({ type: 'setFeedback', fp: fpFor('b'), verdict: 'keep', sample: 's' }, true);
     await h.handle({ type: 'clearFeedback' }, false);
     expect(await h.feedback.all()).toEqual({});
   });

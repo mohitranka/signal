@@ -6,70 +6,122 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header>
-    <h1>Signal</h1>
-    <label class="switch"><input type="checkbox" id="enabled"> <span>Enabled</span></label>
+  <header class="app-header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7"/><path d="M6 15.5h2.2M10.9 12h2.2M15.8 8.5H18" /><path d="M7.1 15.5V18M12 12v6M16.9 8.5V18" /></svg>
+      <div>
+        <h1>Signal</h1>
+        <p id="statusLine" class="status"></p>
+      </div>
+    </div>
+    <label class="switch" title="Turn Signal on or off">
+      <input type="checkbox" id="enabled" role="switch" aria-label="Enabled">
+      <span class="track" aria-hidden="true"></span>
+    </label>
   </header>
 
-  <section>
-    <label>Mode
-      <select id="mode">
-        <option value="review">Review (annotate only, hide nothing)</option>
-        <option value="active">Active (collapse low-quality posts)</option>
-      </select>
-    </label>
-    <label>Sensitivity
-      <select id="sensitivity">
-        <option value="relaxed">Relaxed (only the clearest noise)</option>
-        <option value="balanced">Balanced</option>
-        <option value="strict">Strict (more false positives)</option>
-      </select>
-    </label>
-    <label class="check"><input type="checkbox" id="highlight"> Highlight standout posts</label>
-  </section>
+  <main>
+    <section class="card controls" aria-label="Filtering">
+      <div class="field">
+        <span class="field-label" id="modeLabel">Mode</span>
+        <div class="segmented" role="radiogroup" aria-labelledby="modeLabel" id="mode">
+          <label><input type="radio" name="mode" value="review"><span>Review</span></label>
+          <label><input type="radio" name="mode" value="active"><span>Active</span></label>
+        </div>
+        <p class="help" id="modeHelp"></p>
+      </div>
+      <div class="field">
+        <span class="field-label" id="sensLabel">Sensitivity</span>
+        <div class="segmented" role="radiogroup" aria-labelledby="sensLabel" id="sensitivity">
+          <label><input type="radio" name="sensitivity" value="relaxed"><span>Relaxed</span></label>
+          <label><input type="radio" name="sensitivity" value="balanced"><span>Balanced</span></label>
+          <label><input type="radio" name="sensitivity" value="strict"><span>Strict</span></label>
+        </div>
+        <p class="help" id="sensHelp"></p>
+      </div>
+      <label class="toggle-row">
+        <span>Highlight standout posts</span>
+        <span class="switch small"><input type="checkbox" id="highlight" role="switch"><span class="track" aria-hidden="true"></span></span>
+      </label>
+    </section>
 
-  <details id="llm">
-    <summary>LLM provider</summary>
-    <label>Preset
-      <select id="preset">
-        <option value="">Custom</option>
-        <option value="https://openrouter.ai/api/v1">OpenRouter</option>
-        <option value="https://api.openai.com/v1">OpenAI</option>
-        <option value="http://localhost:11434/v1">Ollama (local)</option>
-      </select>
-    </label>
-    <label>Endpoint (OpenAI-compatible base URL)<input id="endpoint" type="url" spellcheck="false"></label>
-    <label>Model<input id="model" type="text" spellcheck="false" placeholder="e.g. provider/model-name"></label>
-    <label>API key<input id="apiKey" type="password" autocomplete="off" spellcheck="false"></label>
-    <div class="row">
-      <label>Concurrency<input id="concurrency" type="number" min="1" max="8"></label>
-      <label>Timeout (s)<input id="timeoutS" type="number" min="5" max="120"></label>
-    </div>
-    <div class="row">
-      <label>$/1M input tokens<input id="inputPrice" type="number" min="0" step="any" placeholder="optional"></label>
-      <label>$/1M output tokens<input id="outputPrice" type="number" min="0" step="any" placeholder="optional"></label>
-    </div>
-    <div class="row">
-      <button id="save" type="button">Save</button>
-      <button id="test" type="button">Test connection</button>
-    </div>
-    <p id="llmStatus" role="status"></p>
-  </details>
+    <details class="card" id="llm">
+      <summary><span class="title">Model</span><span class="chip" id="llmChip"></span></summary>
+      <div class="body">
+        <label class="input">Provider
+          <select id="preset">
+            <option value="">Custom</option>
+            <option value="https://openrouter.ai/api/v1">OpenRouter</option>
+            <option value="https://api.openai.com/v1">OpenAI</option>
+            <option value="http://localhost:11434/v1">Ollama (local)</option>
+          </select>
+        </label>
+        <label class="input">Endpoint<input id="endpoint" type="url" spellcheck="false"></label>
+        <label class="input">Model<input id="model" type="text" spellcheck="false" placeholder="provider/model-name"></label>
+        <label class="input">API key<input id="apiKey" type="password" autocomplete="off" spellcheck="false"></label>
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <div class="grid2">
+            <label class="input">Concurrency<input id="concurrency" type="number" min="1" max="8"></label>
+            <label class="input">Timeout (s)<input id="timeoutS" type="number" min="5" max="120"></label>
+            <label class="input">$ / 1M input<input id="inputPrice" type="number" min="0" step="any" placeholder="optional"></label>
+            <label class="input">$ / 1M output<input id="outputPrice" type="number" min="0" step="any" placeholder="optional"></label>
+          </div>
+        </details>
+        <div class="actions">
+          <button id="save" type="button" class="btn primary">Save</button>
+          <button id="test" type="button" class="btn">Test connection</button>
+        </div>
+        <p id="llmStatus" role="status"></p>
+      </div>
+    </details>
 
-  <details id="statsBox" open>
-    <summary>This session</summary>
-    <p id="stats"></p>
-  </details>
+    <section class="card" id="statsBox" aria-label="This session">
+      <div class="card-head"><h2>This session</h2><button id="cacheReset" type="button" class="link">Clear cache</button></div>
+      <div class="tiles">
+        <div class="tile"><b id="stClassified">0</b><span>classified</span></div>
+        <div class="tile"><b id="stCache">0</b><span>cache hits</span></div>
+        <div class="tile"><b id="stTokens">0</b><span>tokens</span></div>
+        <div class="tile"><b id="stCost">—</b><span>est. cost</span></div>
+      </div>
+      <p class="meta" id="stats"></p>
+    </section>
 
-  <details id="fbBox">
-    <summary>Feedback <span id="fbCount"></span></summary>
-    <ul id="fbList"></ul>
-    <div class="row">
-      <button id="fbExport" type="button">Export labeled JSONL</button>
-      <button id="fbReset" type="button">Reset feedback</button>
-      <button id="cacheReset" type="button">Clear cache</button>
-    </div>
-  </details>
+    <details class="card" id="corrBox">
+      <summary><span class="title">Your corrections</span><span class="count" id="corrCount"></span></summary>
+      <div class="body">
+        <p id="corrTarget" class="meta"></p>
+        <p id="corrEmpty" class="empty" hidden></p>
+        <table id="corrTable" class="corr" hidden>
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr">Sensitivity</span></th>
+              <th scope="col">Wrongly hidden<span class="sub" id="corrHidSub"></span></th>
+              <th scope="col">Missed<span class="sub" id="corrMisSub"></span></th>
+            </tr>
+          </thead>
+          <tbody id="corrRows"></tbody>
+        </table>
+        <ul id="corrNotes" class="notes"></ul>
+        <details id="corrLeftOut" class="leftout" hidden>
+          <summary id="corrLeftOutSummary"></summary>
+          <ul id="corrLeftOutList" class="items"></ul>
+        </details>
+      </div>
+    </details>
+
+    <details class="card" id="fbBox">
+      <summary><span class="title">Feedback</span><span class="count" id="fbCount"></span></summary>
+      <div class="body">
+        <p id="fbFull" class="notice" hidden></p>
+        <ul id="fbList" class="items"></ul>
+        <div class="actions">
+          <button id="fbExport" type="button" class="btn">Export JSONL</button>
+          <button id="fbReset" type="button" class="btn danger">Reset</button>
+        </div>
+      </div>
+    </details>
+  </main>
 
   <script src="popup.js"></script>
 </body>

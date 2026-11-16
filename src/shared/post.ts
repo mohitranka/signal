@@ -29,3 +29,11 @@ export async function fingerprint(input: PostInput): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
   return Array.from(new Uint8Array(digest).subarray(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+/** Shape check for a PostInput arriving from an untrusted sender. Lengths are enforced by prepareInput(). */
+export function isPostInput(x: unknown): x is PostInput {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return false;
+  const r = x as Record<string, unknown>;
+  const optional = (v: unknown) => v === undefined || typeof v === 'string';
+  return typeof r.text === 'string' && optional(r.quoted) && optional(r.linkTitle) && optional(r.linkDescription);
+}

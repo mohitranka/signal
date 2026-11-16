@@ -1,31 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { decide } from '../src/policy';
-import type { Classification, Decision, PostInput, Sensitivity } from '../src/shared/types';
+import { coerceClassification } from '../src/classifier/parse';
+import type { PostInput } from '../src/shared/types';
+import type { Metrics, Prediction, Row } from '../src/scoring';
 
-export interface Row {
-  id: string;
-  source: 'synthetic' | 'user-feedback' | 'manual';
-  category?: string;
-  label: Decision;
-  /** Other outcomes that are also acceptable (e.g. "keep or highlight"). */
-  also_ok?: Decision[];
-  adversarial?: boolean;
-  text: string;
-  quoted?: string;
-  linkTitle?: string;
-  linkDescription?: string;
-}
-
-export interface Prediction {
-  row: Row;
-  /** null when classification failed; scored as "keep" (fail open). */
-  classification: Classification | null;
-  latencyMs?: number;
-  promptTokens?: number;
-  completionTokens?: number;
-  httpRequests?: number;
-  error?: string;
-}
+// Scoring lives in src/scoring.ts so the extension popup runs the same code. Re-exported for eval/ callers.
+export { score, type Metrics, type Prediction, type Row } from '../src/scoring';
 
 export function loadDataset(path: string): Row[] {
   const rows: Row[] = [];
@@ -39,6 +18,14 @@ export function loadDataset(path: string): Row[] {
       if (!['collapse', 'keep', 'highlight'].includes(r.label)) throw new Error(`${path}:${i + 1}: bad label`);
       if (!r.text || typeof r.text !== 'string') throw new Error(`${path}:${i + 1}: missing text`);
       if (!['synthetic', 'user-feedback', 'manual'].includes(r.source)) throw new Error(`${path}:${i + 1}: bad source`);
+      // Exported feedback carries the classification it corrected; validate it like live model output.
+      if (r.classification !== undefined) {
+        try {
+          r.classification = coerceClassification(r.classification);
+        } catch {
+          throw new Error(`${path}:${i + 1}: bad classification`);
+        }
+      }
       seen.add(r.id);
       rows.push(r);
     });
@@ -51,70 +38,6 @@ export const toInput = (r: Row): PostInput => ({
   ...(r.linkTitle ? { linkTitle: r.linkTitle } : {}),
   ...(r.linkDescription ? { linkDescription: r.linkDescription } : {}),
 });
-
-const ratio = (n: number, d: number) => (d === 0 ? null : n / d);
-
-export interface Metrics {
-  n: number;
-  failures: number;
-  collapsedCount: number;
-  highlightedCount: number;
-  /** Of posts Signal would collapse, fraction labeled collapse. */
-  collapsePrecision: number | null;
-  /** Of posts labeled collapse, fraction Signal would collapse. */
-  collapseRecall: number | null;
-  /** Of posts labeled keep/highlight (substantive), fraction wrongly collapsed. THE number to minimize. */
-  falsePositiveRate: number | null;
-  falsePositives: string[];
-  highlightPrecisionStrict: number | null;
-  highlightPrecisionLenient: number | null;
-  highlightRecall: number | null;
-  confusion: Record<Decision, Record<Decision, number>>; // [label][outcome]
-}
-
-export function score(preds: Prediction[], sensitivity: Sensitivity, highlightEnabled = true): Metrics {
-  const confusion = {
-    collapse: { collapse: 0, keep: 0, highlight: 0 },
-    keep: { collapse: 0, keep: 0, highlight: 0 },
-    highlight: { collapse: 0, keep: 0, highlight: 0 },
-  } as Metrics['confusion'];
-  const falsePositives: string[] = [];
-  let failures = 0;
-
-  for (const p of preds) {
-    let outcome: Decision = 'keep';
-    if (p.classification) outcome = decide(p.classification, { sensitivity, highlightEnabled }).outcome;
-    else failures++;
-    confusion[p.row.label][outcome]++;
-    if (outcome === 'collapse' && p.row.label !== 'collapse') falsePositives.push(p.row.id);
-  }
-
-  const col = (o: Decision) => confusion.collapse[o] + confusion.keep[o] + confusion.highlight[o];
-  const labeled = (l: Decision) => confusion[l].collapse + confusion[l].keep + confusion[l].highlight;
-
-  // Lenient highlight precision also accepts rows whose also_ok lists "highlight".
-  let hlLenient = 0;
-  for (const p of preds) {
-    if (!p.classification) continue;
-    const o = decide(p.classification, { sensitivity, highlightEnabled }).outcome;
-    if (o === 'highlight' && (p.row.label === 'highlight' || p.row.also_ok?.includes('highlight'))) hlLenient++;
-  }
-
-  return {
-    n: preds.length,
-    failures,
-    collapsedCount: col('collapse'),
-    highlightedCount: col('highlight'),
-    collapsePrecision: ratio(confusion.collapse.collapse, col('collapse')),
-    collapseRecall: ratio(confusion.collapse.collapse, labeled('collapse')),
-    falsePositiveRate: ratio(confusion.keep.collapse + confusion.highlight.collapse, labeled('keep') + labeled('highlight')),
-    falsePositives,
-    highlightPrecisionStrict: ratio(confusion.highlight.highlight, col('highlight')),
-    highlightPrecisionLenient: ratio(hlLenient, col('highlight')),
-    highlightRecall: ratio(confusion.highlight.highlight, labeled('highlight')),
-    confusion,
-  };
-}
 
 const pct = (v: number | null) => (v === null ? 'n/a' : `${(v * 100).toFixed(1)}%`);
 

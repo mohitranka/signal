@@ -77,6 +77,7 @@ describe('content/index', () => {
 });
 
 describe('service-worker', () => {
+  const POPUP = { id: 'me', url: 'chrome-extension://me/popup.html', origin: 'chrome-extension://me' };
   it('wires message handling, tab notification and suspend flush', async () => {
     const area = () => {
       const m: Record<string, unknown> = {};
@@ -92,7 +93,7 @@ describe('service-worker', () => {
     const local = area();
     const chromeMock = {
       storage: { local, session: area() },
-      runtime: { id: 'me', onMessage: { addListener: (f: any) => (onMsg = f) }, onSuspend: { addListener: (f: any) => (onSuspend = f) } },
+      runtime: { id: 'me', getURL: (p: string) => `chrome-extension://me/${p}`, onMessage: { addListener: (f: any) => (onMsg = f) }, onSuspend: { addListener: (f: any) => (onSuspend = f) } },
       tabs: {
         query: vi.fn(async () => [{ id: 5 }, {}]),
         sendMessage: vi.fn(() => Promise.reject(new Error('gone'))),
@@ -106,27 +107,39 @@ describe('service-worker', () => {
     // foreign sender is ignored
     expect(onMsg({ type: 'getSettings' }, { id: 'evil' }, vi.fn())).toBe(false);
 
+    // F2: an extension page is trusted whether or not it sits in a tab; a content script (or a sender with no URL) is not
+    const inTab = vi.fn();
+    onMsg({ type: 'getSettings' }, { ...POPUP, tab: { id: 3 } }, inTab);
+    await flush();
+    expect(inTab).toHaveBeenCalledWith(expect.objectContaining({ mode: expect.any(String) }));
+    for (const sender of [{ id: 'me', tab: { id: 3 }, url: 'https://www.linkedin.com/feed/', origin: 'https://www.linkedin.com' }, { id: 'me' }]) {
+      const refused = vi.fn();
+      onMsg({ type: 'getSettings' }, sender, refused);
+      await flush();
+      expect(refused).toHaveBeenCalledWith({ error: 'forbidden' });
+    }
+
     const res = vi.fn();
-    expect(onMsg({ type: 'getSettings' }, { id: 'me' }, res)).toBe(true);
+    expect(onMsg({ type: 'getSettings' }, POPUP, res)).toBe(true);
     await flush();
     expect(res).toHaveBeenCalledWith(expect.objectContaining({ mode: expect.any(String) }));
 
     // saving settings notifies LinkedIn tabs; a failing tab send is swallowed
     const saved = vi.fn();
-    onMsg({ type: 'saveSettings', patch: { enabled: false } }, { id: 'me' }, saved);
+    onMsg({ type: 'saveSettings', patch: { enabled: false } }, POPUP, saved);
     await flush();
     expect(saved).toHaveBeenCalled();
     expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(5, { type: 'settingsChanged' });
 
     // handler errors become { error }
     const bad = vi.fn();
-    onMsg({ type: 'nope' }, { id: 'me' }, bad);
+    onMsg({ type: 'nope' }, POPUP, bad);
     await flush();
     expect(bad).toHaveBeenCalled();
 
     // tab query failure is swallowed
     chromeMock.tabs.query.mockRejectedValueOnce(new Error('x'));
-    onMsg({ type: 'saveSettings', patch: { enabled: true } }, { id: 'me' }, vi.fn());
+    onMsg({ type: 'saveSettings', patch: { enabled: true } }, POPUP, vi.fn());
     await flush();
 
     onSuspend();

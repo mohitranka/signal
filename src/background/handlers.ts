@@ -1,5 +1,7 @@
+import { FP_PATTERN, isVerdict } from '../shared/feedback';
 import { toPublic } from '../shared/settings';
-import type { BackgroundMessage, Settings, StateResponse } from '../shared/types';
+import { fingerprint, isPostInput, prepareInput } from '../shared/post';
+import type { BackgroundMessage, ClassifyResult, Settings, StateResponse } from '../shared/types';
 import type { ClassifyService } from './classifyService';
 import type { CacheStore, FeedbackStore, SettingsStore, StatsStore } from './store';
 
@@ -15,6 +17,8 @@ export interface HandlerDeps {
 
 const CONTENT_TYPES = new Set(['classify', 'cancelAll', 'getState', 'setFeedback']);
 
+const invalid = (message: string): ClassifyResult => ({ ok: false, kind: 'invalid', message });
+
 /**
  * `fromContent` is true when the sender is a web-page content script. Content scripts run next to
  * third-party page code, so they may only use the narrow content API: never settings writes,
@@ -25,18 +29,34 @@ export function createHandler(d: HandlerDeps) {
     if (fromContent && !CONTENT_TYPES.has(msg.type)) return { error: 'forbidden' };
 
     switch (msg.type) {
-      case 'classify':
-        return d.service.classify(msg.fp, msg.input);
+      case 'classify': {
+        // The content script already did this; redo it so a compromised content script cannot send oversized posts
+        // (spending the user's API budget) or file one post's verdict under another post's fingerprint.
+        if (typeof msg.fp !== 'string' || !FP_PATTERN.test(msg.fp)) return invalid('Malformed fingerprint.');
+        if (!isPostInput(msg.input)) return invalid('Malformed post input.');
+        const input = prepareInput(msg.input);
+        if (typeof msg.fp !== 'string' || msg.fp !== (await fingerprint(input))) return invalid('Fingerprint does not match the post.');
+        return d.service.classify(msg.fp, input);
+      }
       case 'cancelAll':
         d.service.cancelAll();
         return { ok: true };
       case 'getState': {
-        const state: StateResponse = { settings: toPublic(await d.settings.load()), feedback: await d.feedback.verdicts() };
+        // Feedback trouble (e.g. storage errors) must not stop the feed from working: fall back to no corrections.
+        const feedback = await d.feedback.verdicts().catch(() => ({}));
+        const state: StateResponse = { settings: toPublic(await d.settings.load()), feedback };
         return state;
       }
-      case 'setFeedback':
-        await d.feedback.set(msg.fp, msg.verdict, msg.sample, msg.modelDecision, msg.modelConfidence);
-        return { ok: true };
+      case 'setFeedback': {
+        if (typeof msg.fp !== 'string' || !FP_PATTERN.test(msg.fp)) return { error: 'bad fingerprint' };
+        if (msg.verdict !== null && !isVerdict(msg.verdict)) return { error: 'bad verdict' };
+        const saved = await d.feedback.set(msg.fp, msg.verdict, String(msg.sample ?? ''), {
+          modelDecision: msg.modelDecision,
+          modelConfidence: msg.modelConfidence,
+          classified: msg.classified,
+        });
+        return saved ? { ok: true } : { error: 'feedback-full' };
+      }
 
       case 'getSettings':
         return toPublic(await d.settings.load());

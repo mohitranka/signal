@@ -23,26 +23,73 @@ export interface Actions {
 
 const CSS = `
 :host { all: initial; display: block; }
-.bar { font: 12px/1.4 -apple-system, system-ui, "Segoe UI", sans-serif; color: #5f6368; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 8px; }
-.bar.collapsed { background: #f3f2ef; border: 1px solid #e0dfdc; border-radius: 8px; padding: 10px 12px; margin: 4px 0; }
-.label { font-weight: 600; color: #3c4043; }
-.reason { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
-button { all: unset; cursor: pointer; color: #0a66c2; font-weight: 600; padding: 2px 4px; border-radius: 4px; }
-button:hover, button:focus-visible { background: rgba(10,102,194,.1); }
-.review { border-left: 3px solid #bdbdbd; }
-.review.highlight { border-left-color: #2f7d6d; }
-.review.collapse { border-left-color: #c0504d; }
-@media (prefers-color-scheme: dark) { .bar { color: #b0b0b0; } .label { color: #e0e0e0; } .bar.collapsed { background: #2b2b2b; border-color: #3a3a3a; } }
+.bar {
+  --fg: #5e6670; --strong: #1c1f23; --surface: #ffffff; --border: #e0e3e7; --hover: #f1f3f5;
+  --accent: #2f7d6d; --danger: #c2413a; --neutral: #a4abb3; --focus: #0a66c2;
+  font: 12.5px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--fg);
+  display: flex; align-items: center; gap: 10px; padding: 6px 4px;
+}
+.label { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: var(--strong); white-space: nowrap; }
+.label::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--neutral)); flex: none; }
+.reason { flex: 1 1 auto; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+button {
+  all: unset; cursor: pointer; white-space: nowrap; font-weight: 600; font-size: 12px; color: var(--strong);
+  padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+}
+button:first-of-type { margin-left: auto; }
+button:hover { background: var(--hover); }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.bar.collapsed { --dot: var(--danger); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 10px 14px; margin: 0 0 8px; }
+.review.highlight { --dot: var(--accent); }
+.review.collapse { --dot: var(--danger); }
+.bar.quiet { justify-content: flex-end; padding: 0 4px 4px; }
+.bar.quiet button { opacity: .55; font-weight: 500; font-size: 11.5px; padding: 2px 10px; color: var(--fg); transition: opacity .12s; }
+.bar.quiet button:hover, .bar.quiet button:focus-visible { opacity: 1; color: var(--strong); }
+@media (prefers-color-scheme: dark) {
+  .bar { --fg: #a9b0b8; --strong: #e7e9ec; --surface: #1e2226; --border: #363b41; --hover: #2a2f34; --accent: #5cbfa8; --danger: #ff8a80; --neutral: #6f7680; --focus: #70b5f9; }
+}
 `;
 
+/**
+ * Tooltip for a post Signal kept in review mode. The confidence is the model's confidence in ITS decision,
+ * which can be collapse or highlight even though the post was kept (below a threshold, vetoed by the policy,
+ * or highlighting turned off). Say only what is known; never imply the model was confident the post was fine.
+ */
+function keptSummary(view: View): string {
+  const pct = view.confidence !== undefined ? `${Math.round(view.confidence * 100)}%` : '';
+  const reason = view.reason ? `: ${view.reason}` : '';
+  if (view.modelDecision === 'collapse') return `Kept, although the model rated it low quality${pct ? ` (${pct})` : ''}${reason}`;
+  if (view.modelDecision === 'highlight') return `Kept, although the model rated it a standout${pct ? ` (${pct})` : ''}${reason}`;
+  return `Kept${pct ? ` (model ${pct} confident)` : ''}${reason}`;
+}
+
 export const ATTR_HIDDEN = 'data-signal-hidden';
+
+/**
+ * Shadow roots are closed so LinkedIn's page scripts cannot read Signal's verdicts or reach its buttons.
+ * Signal keeps its own references here. (Content-script module scope is not reachable from the page.)
+ */
+const roots = new WeakMap<Element, ShadowRoot>();
+export const shadowRootOf = (host: Element): ShadowRoot | undefined => roots.get(host);
+
+export interface PresenterOptions {
+  /** Accept only clicks from real user input, so page scripts cannot press Signal's buttons. Injectable for jsdom tests. */
+  isTrusted?: (e: Event) => boolean;
+}
 export const ATTR_STATE = 'data-signal';
 
 export class Presenter {
   private hosts = new Map<HTMLElement, { host: HTMLElement; root: ShadowRoot }>();
   private sheet: CSSStyleSheet | null = null;
 
-  constructor(private doc: Document) {}
+  private isTrusted: (e: Event) => boolean;
+
+  constructor(
+    private doc: Document,
+    opts: PresenterOptions = {},
+  ) {
+    this.isTrusted = opts.isTrusted ?? ((e) => e.isTrusted);
+  }
 
   /** Render a view, or remove every trace of Signal when view is null. */
   apply(post: HTMLElement, view: View | null, actions: Actions): void {
@@ -97,7 +144,8 @@ export class Presenter {
     if (existing && existing.host.isConnected) return existing;
     const host = this.doc.createElement('div');
     host.setAttribute('data-signal-bar', '');
-    const root = host.attachShadow({ mode: 'open' });
+    const root = host.attachShadow({ mode: 'closed' });
+    roots.set(host, root);
     this.attachStyles(root);
     post.insertAdjacentElement('beforebegin', host);
     const entry = { host, root };
@@ -133,6 +181,7 @@ export class Presenter {
       b.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (!this.isTrusted(e)) return; // synthetic click from a page script
         fn();
       });
       return b;
@@ -169,13 +218,25 @@ export class Presenter {
       return bar;
     }
 
-    // Review-mode annotation.
+    // Review mode, model kept the post: no annotation text, just a quiet way to mark it low quality.
+    // The verdict and reason stay available on hover and to screen readers.
+    if (view.outcome === 'keep') {
+      bar.classList.add('quiet');
+      const summary = keptSummary(view);
+      const b = btn('Low quality', a.lowQuality);
+      b.title = summary; // attribute text, never parsed as HTML
+      b.setAttribute('aria-label', `Mark low quality. ${summary}`);
+      bar.appendChild(b);
+      return bar;
+    }
+
+    // Review-mode annotation for a verdict Signal would act on.
     bar.classList.add('review', view.outcome);
     const pct = view.confidence !== undefined ? ` ${Math.round(view.confidence * 100)}%` : '';
     const verdict = view.outcome === 'collapse' ? 'would collapse' : view.outcome;
     bar.appendChild(el('span', 'label', `Signal: ${verdict}${pct}`));
     reason(view.reason);
-    if (view.outcome !== 'collapse') bar.appendChild(btn('Low quality', a.lowQuality));
+    if (view.outcome === 'highlight') bar.appendChild(btn('Low quality', a.lowQuality));
     else bar.appendChild(btn('Worth keeping', a.keep));
     return bar;
   }
