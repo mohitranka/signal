@@ -12,9 +12,11 @@ interface Entry<T = unknown> {
   resolve: (v: T) => void;
   reject: (e: unknown) => void;
   started: boolean;
+  /** Callers currently waiting for this request (deduplicated run() calls for the same key). */
+  waiters: number;
 }
 
-/** FIFO queue with bounded concurrency, in-flight deduplication by key, and cancel-all. */
+/** FIFO queue with bounded concurrency, in-flight deduplication by key, per-key release, and cancel-all. */
 export class TaskQueue {
   private pending: Entry[] = [];
   private byKey = new Map<string, Entry>();
@@ -33,18 +35,37 @@ export class TaskQueue {
 
   run<T>(key: string, task: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const existing = this.byKey.get(key);
-    if (existing) return existing.promise as Promise<T>;
+    if (existing) {
+      existing.waiters++;
+      return existing.promise as Promise<T>;
+    }
     let resolve!: (v: T) => void;
     let reject!: (e: unknown) => void;
     const promise = new Promise<T>((res, rej) => {
       resolve = res;
       reject = rej;
     });
-    const entry: Entry<T> = { key, task, ctrl: new AbortController(), promise, resolve, reject, started: false };
+    const entry: Entry<T> = { key, task, ctrl: new AbortController(), promise, resolve, reject, started: false, waiters: 1 };
     this.byKey.set(key, entry as Entry);
     this.pending.push(entry as Entry);
     this.pump();
     return promise;
+  }
+
+  /**
+   * One waiter no longer needs this request (e.g. the post's text grew). Only when nobody else waits for it is the
+   * request dropped (if still queued: it is never started) or aborted (if in flight). Unknown keys are ignored.
+   */
+  release(key: string): void {
+    const e = this.byKey.get(key);
+    if (!e || --e.waiters > 0) return;
+    if (!e.started) {
+      this.pending = this.pending.filter((x) => x !== e);
+      this.byKey.delete(key);
+      e.reject(new AbortedError());
+    } else {
+      e.ctrl.abort();
+    }
   }
 
   /** Reject everything queued and abort everything in flight (stale after navigation or settings change). */

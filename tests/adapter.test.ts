@@ -70,3 +70,55 @@ describe('linkedin adapter', () => {
     expect(isFeedRoute({ pathname: '/messaging/' })).toBe(false);
   });
 });
+
+describe('isPostTextChange: which page changes can mean a post\'s text grew (X1/X2)', () => {
+  /** The MutationRecords a change produces, as the controller's observer would see them. */
+  const recordsOf = (mutate: () => void): MutationRecord[] => {
+    const mo = new MutationObserver(() => {});
+    mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+    mutate();
+    const records = mo.takeRecords();
+    mo.disconnect();
+    return records;
+  };
+  const anyText = (mutate: () => void) => recordsOf(mutate).some((r) => linkedinAdapter.isPostTextChange(r));
+  const $ = (sel: string) => document.querySelector<HTMLElement>(sel)!;
+
+  beforeEach(() => {
+    document.body.innerHTML = feed(
+      classicPost('1', 'A classic post body that is long enough to count.', repostExtra + linkExtra),
+      sduiPost('k', 'An SDUI post body that is long enough to count.'),
+    );
+  });
+
+  it('classic post text: re-rendered, edited in place, or appended', () => {
+    expect(anyText(() => ($('[data-urn] .feed-shared-update-v2__description span').textContent = 'A longer classic post body, now with the rest of the text.'))).toBe(true);
+    expect(anyText(() => (($('[data-urn] .feed-shared-update-v2__description span').firstChild as Text).data += ' more'))).toBe(true);
+    expect(anyText(() => $('[data-urn] .feed-shared-update-v2__description span').append(' and more'))).toBe(true);
+  });
+
+  it('reshared text and link previews count', () => {
+    expect(anyText(() => $('.update-components-mini-update-v2 .update-components-text').append(' The rest of the original.'))).toBe(true);
+    expect(anyText(() => $('.update-components-article__description').append(' (continued)'))).toBe(true);
+  });
+
+  it('SDUI post text counts; SDUI comment text does not', () => {
+    expect(anyText(() => $('[componentkey="k"] > p[data-testid="expandable-text-box"]').append(' More SDUI text.'))).toBe(true);
+    expect(anyText(() => $('[componentkey="k"] [role="list"] p[data-testid="expandable-text-box"]').append(' A longer comment.'))).toBe(false);
+  });
+
+  it('timestamps, reactions and classic comments do not count', () => {
+    expect(anyText(() => (($('.update-components-actor__sub-description span').firstChild as Text).data = '3h'))).toBe(false);
+    expect(anyText(() => $('[data-urn]').insertAdjacentHTML('beforeend', '<span class="social-counts">42 reactions</span>'))).toBe(false);
+    expect(anyText(() => $('.comments-comments-list').insertAdjacentHTML('beforeend', '<article class="comments-comment-item"><div class="update-components-text">A new comment that is long enough.</div></article>'))).toBe(false);
+    expect(anyText(() => ($('.comments-comment-item .update-components-text').textContent = 'An edited comment, now longer than before.'))).toBe(false);
+  });
+
+  it('LinkedIn replacing the whole text container counts (the change targets the post, not a text area)', () => {
+    const post = $('[data-urn]');
+    const fresh = document.createElement('div');
+    fresh.className = 'feed-shared-update-v2__description';
+    fresh.innerHTML = '<div class="update-components-text"><span dir="ltr">A classic post body that is long enough to count, and the rest.</span></div>';
+    expect(anyText(() => post.replaceChild(fresh, $('[data-urn] .feed-shared-update-v2__description')))).toBe(true);
+  });
+});

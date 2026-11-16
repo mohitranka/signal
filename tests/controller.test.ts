@@ -92,18 +92,7 @@ const clickInBar = (label: string, i = 0) => {
   b!.click();
 };
 
-/**
- * Slow-machine mode: SIGNAL_TEST_SLOW_HASH=<ms> delays content fingerprinting (crypto.subtle.digest) like a loaded
- * CI box does. The suite must pass with it; tests must wait for the controller, not for a fixed number of ms.
- */
-const SLOW_HASH_MS = Number(process.env.SIGNAL_TEST_SLOW_HASH ?? 0);
-if (SLOW_HASH_MS > 0) {
-  const digest = crypto.subtle.digest.bind(crypto.subtle);
-  vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (...args: Parameters<typeof digest>) => {
-    await new Promise((r) => setTimeout(r, SLOW_HASH_MS));
-    return digest(...args);
-  });
-}
+// Slow-machine mode (SIGNAL_TEST_SLOW_HASH) is set up for every test file in tests/setup.ts.
 
 beforeEach(() => {
   document.body.innerHTML = feed(classicPost('1', POSTS.hype), classicPost('2', POSTS.insight), classicPost('3', POSTS.plain));

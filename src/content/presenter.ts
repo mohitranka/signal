@@ -9,8 +9,13 @@ export interface View {
   confidence?: number;
   /** Review mode annotates but never hides model-decided posts. */
   review: boolean;
-  /** User pressed "Show post" on a collapsed post. */
+  /** User pressed "Show post" on a collapsed post, or (see visibleBecause) the post is kept visible for them. */
   revealed: boolean;
+  /**
+   * Why a collapse verdict is not hiding the post: the user revealed it ("Collapsed by Signal · Hide again"), or
+   * expanded it to read and it was never hidden ("Signal would collapse this · Hide"). Defaults to 'revealed'.
+   */
+  visibleBecause?: 'revealed' | 'expanded';
 }
 
 export interface Actions {
@@ -63,6 +68,13 @@ function keptSummary(view: View): string {
   return `Kept${pct ? ` (model ${pct} confident)` : ''}${reason}`;
 }
 
+/** Is this view rendered as a hidden (collapsed) post? Shared with the controller's tab statistics. */
+export const isCollapsedView = (view: View): boolean =>
+  view.outcome === 'collapse' && !view.revealed && (view.source === 'user' || !view.review);
+
+/** Is this view rendered with the highlight edge? (Review mode only annotates.) */
+export const isHighlightedView = (view: View): boolean => view.outcome === 'highlight' && !view.review;
+
 export const ATTR_HIDDEN = 'data-signal-hidden';
 
 /**
@@ -95,8 +107,8 @@ export class Presenter {
   apply(post: HTMLElement, view: View | null, actions: Actions): void {
     if (!view) return this.clear(post);
 
-    const collapsed = view.outcome === 'collapse' && !view.revealed && (view.source === 'user' || !view.review);
-    const highlighted = view.outcome === 'highlight' && !view.review;
+    const collapsed = isCollapsedView(view);
+    const highlighted = isHighlightedView(view);
 
     if (collapsed) post.setAttribute(ATTR_HIDDEN, '');
     else post.removeAttribute(ATTR_HIDDEN);
@@ -211,9 +223,10 @@ export class Presenter {
     }
 
     if (view.revealed) {
-      bar.appendChild(el('span', 'label', 'Collapsed by Signal'));
+      const expanded = view.visibleBecause === 'expanded';
+      bar.appendChild(el('span', 'label', expanded ? 'Signal would collapse this' : 'Collapsed by Signal'));
       reason(view.reason);
-      bar.appendChild(btn('Hide again', a.hide));
+      bar.appendChild(btn(expanded ? 'Hide' : 'Hide again', a.hide));
       bar.appendChild(btn('Worth keeping', a.keep));
       return bar;
     }

@@ -15,6 +15,8 @@ export interface ServiceDeps {
 /** Orchestrates cache lookup, request dedup/queueing, the HTTP client, and statistics. */
 export class ClassifyService {
   private queue = new TaskQueue();
+  /** For each request in the queue: which senders are waiting for it, and how many times. */
+  private interest = new Map<string, Map<string, number>>();
 
   constructor(private deps: ServiceDeps) {}
 
@@ -22,7 +24,22 @@ export class ClassifyService {
     this.queue.cancelAll();
   }
 
-  async classify(fp: string, input: PostInput): Promise<ClassifyResult> {
+  /**
+   * `waiter` no longer needs this post's request. Only its own interest is released, once (repeats and requests it
+   * never asked for are ignored); the request is dropped or aborted only when no sender waits for it any more.
+   */
+  async cancel(fp: string, waiter = 'unknown'): Promise<void> {
+    const settings = await this.deps.loadSettings();
+    const key = `${PROMPT_VERSION}|${settings.model}|${fp}`;
+    const waiting = this.interest.get(key);
+    const n = waiting?.get(waiter) ?? 0;
+    if (!waiting || n === 0) return;
+    if (n === 1) waiting.delete(waiter);
+    else waiting.set(waiter, n - 1);
+    this.queue.release(key);
+  }
+
+  async classify(fp: string, input: PostInput, waiter = 'unknown'): Promise<ClassifyResult> {
     const settings = await this.deps.loadSettings();
     const problem = configProblem(settings);
     if (problem) return { ok: false, kind: 'config', message: problem };
@@ -35,10 +52,13 @@ export class ClassifyService {
     }
 
     this.queue.setConcurrency(settings.concurrency);
+    const waiting = this.interest.get(key) ?? new Map<string, number>();
+    this.interest.set(key, waiting);
+    waiting.set(waiter, (waiting.get(waiter) ?? 0) + 1);
     try {
       const out = await this.queue.run(key, (signal) =>
         classifyPost(settings, input, { ...this.deps.http, signal }),
-      );
+      ).finally(() => this.interest.delete(key)); // settled for every waiter at once
       await this.deps.cache.set(key, out.classification);
       await this.deps.stats.bump({
         httpRequests: out.httpRequests,

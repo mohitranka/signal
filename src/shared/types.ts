@@ -110,6 +110,8 @@ export interface PageStats {
 export type ContentMessage =
   | { type: 'classify'; fp: string; input: PostInput }
   | { type: 'cancelAll' }
+  /** The post's text grew: this fingerprint's request is no longer needed by this caller. */
+  | { type: 'cancel'; fp: string }
   | { type: 'getState' }
   | {
       type: 'setFeedback';

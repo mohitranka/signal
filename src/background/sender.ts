@@ -11,3 +11,13 @@ export function isExtensionPage(sender: chrome.runtime.MessageSender, extensionB
   if (sender.origin !== undefined) return sender.origin === origin;
   return typeof sender.url === 'string' && sender.url.startsWith(`${origin}/`);
 }
+
+/**
+ * Who is waiting for a classification: a content script by tab and frame, an extension page by its URL.
+ * Lets `cancel` release only the caller's own interest in a shared request (never another tab's).
+ */
+export function waiterIdOf(sender: chrome.runtime.MessageSender): string {
+  if (sender.tab?.id !== undefined) return `tab:${sender.tab.id}:${sender.frameId ?? 0}`;
+  if (typeof sender.url === 'string') return `page:${sender.url}`;
+  return 'unknown';
+}

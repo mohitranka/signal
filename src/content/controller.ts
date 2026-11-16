@@ -12,7 +12,7 @@ import type {
   StateResponse,
   Verdict,
 } from '../shared/types';
-import { Presenter, type View } from './presenter';
+import { Presenter, isCollapsedView, isHighlightedView, type View } from './presenter';
 
 export interface ControllerDeps {
   doc: Document;
@@ -22,6 +22,12 @@ export interface ControllerDeps {
   /** Injectable for tests; defaults to IntersectionObserver with a generous look-ahead margin. */
   observeVisible?: (cb: (el: HTMLElement) => void) => { observe(el: HTMLElement): void; unobserve(el: HTMLElement): void; disconnect(): void };
   scanDebounceMs?: number;
+  /** Wait this long after the last change inside a post before checking whether its text grew (default 400 ms). */
+  growthSettleMs?: number;
+  /** Accept only real user clicks as "the user expanded this post". Injectable for jsdom (default: e.isTrusted). */
+  isTrustedClick?: (e: Event) => boolean;
+  /** Clock (injectable for tests). */
+  now?: () => number;
   /** Route gate: Signal only ever acts on the main feed. */
   shouldRun?: () => boolean;
 }
@@ -31,11 +37,31 @@ interface PostState {
   status: 'new' | 'pending' | 'done' | 'failed' | 'skipped';
   fp?: string;
   input?: PostInput;
+  /**
+   * Fingerprint of the text this post was first seen with. Marks (feedback) are saved and looked up under it, so a
+   * mark survives the text growing ("…more") and a reload, when the post is cut off again.
+   */
+  markFp?: string;
   /** The classification shown for this post, with the model and prompt version that produced it. */
   record?: ClassificationRecord;
   revealed: boolean;
+  /** The user expanded this post to read it, so a model verdict must not hide it (Active mode). */
+  keepVisible?: boolean;
+  /** When the user last clicked inside the post (trusted clicks only). */
+  clickedAt?: number;
+  /** How many times this post has been re-judged after its text grew (capped). */
+  rejudged?: number;
   visible: boolean;
 }
+
+/** Total length of everything sent to the model; "the text grew" means this got larger. */
+const inputLength = (i: PostInput): number =>
+  i.text.length + (i.quoted?.length ?? 0) + (i.linkTitle?.length ?? 0) + (i.linkDescription?.length ?? 0);
+
+/** A growth only counts as "the user expanded it" if they clicked inside the (visible) post this recently. */
+const USER_EXPAND_WINDOW_MS = 10_000;
+/** Re-judgements per post per page load: a real expansion needs 1 (2 if text arrives after settling). */
+const MAX_REJUDGEMENTS = 3;
 
 // Errors that will fail identically for every post until the user changes settings.
 const BLOCKING: ReadonlySet<ErrorKind> = new Set(['config', 'auth']);
@@ -49,6 +75,8 @@ export class FeedController {
   private observer: MutationObserver | null = null;
   private visibility: ReturnType<NonNullable<ControllerDeps['observeVisible']>> | null = null;
   private scanTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Per-post settle timers: a post's text is re-checked once it has stopped changing. */
+  private growTimers = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
   private epoch = 0;
   private blocked = false;
   private running = false;
@@ -63,8 +91,10 @@ export class FeedController {
     this.running = true;
     const make = this.d.observeVisible ?? defaultObserveVisible;
     this.visibility = make((el) => this.onVisible(el));
-    this.observer = new MutationObserver(() => this.scheduleScan());
-    this.observer.observe(this.d.doc.body, { childList: true, subtree: true });
+    this.d.doc.addEventListener('click', this.onClick, true);
+    this.observer = new MutationObserver((records) => this.onMutations(records));
+    // characterData too: LinkedIn may reveal "…more" text by editing a text node in place.
+    this.observer.observe(this.d.doc.body, { childList: true, subtree: true, characterData: true });
     this.scan();
   }
 
@@ -72,12 +102,15 @@ export class FeedController {
   stop(): void {
     this.running = false;
     this.epoch++;
+    this.d.doc.removeEventListener('click', this.onClick, true);
     this.observer?.disconnect();
     this.observer = null;
     this.visibility?.disconnect();
     this.visibility = null;
     if (this.scanTimer) clearTimeout(this.scanTimer);
     this.scanTimer = null;
+    for (const t of this.growTimers.values()) clearTimeout(t);
+    this.growTimers.clear();
     for (const el of this.posts.keys()) this.d.presenter.clear(el);
     this.d.presenter.prune();
     this.posts.clear();
@@ -102,7 +135,7 @@ export class FeedController {
       this.epoch++;
       for (const [el, st] of this.posts) {
         if (st.status === 'done' || st.status === 'pending' || st.status === 'failed') {
-          this.resetState(el, st);
+          this.resetState(el, st, { samePost: true });
         }
       }
     }
@@ -120,13 +153,109 @@ export class FeedController {
       const v = this.viewFor(st);
       if (st.status !== 'done' || !v) continue;
       classified++;
-      if (v.outcome === 'collapse' && (v.source === 'user' || !v.review)) collapsed++;
-      if (v.outcome === 'highlight') highlighted++;
+      // Count what is actually on screen: not posts you revealed or expanded, nor Review-mode annotations.
+      if (isCollapsedView(v)) collapsed++;
+      if (isHighlightedView(v)) highlighted++;
     }
     return { tracked: this.posts.size, classified, collapsed, highlighted, failed };
   }
 
   // ---- scanning -----------------------------------------------------------------------------
+
+  /** Remember real user clicks inside a post ("…more"): only those make a growth count as "the user is reading it". */
+  private onClick = (e: Event): void => {
+    if (!(this.d.isTrustedClick ?? ((x: Event) => x.isTrusted))(e)) return; // page scripts cannot fake these
+    for (let n = e.target as Node | null; n; n = n.parentNode) {
+      const st = n.nodeType === 1 ? this.posts.get(n as HTMLElement) : undefined;
+      if (st) {
+        st.clickedAt = this.now();
+        return;
+      }
+    }
+  };
+
+  private now(): number {
+    return (this.d.now ?? Date.now)();
+  }
+
+  /** New/removed posts are found by the (debounced) scan; changes inside a tracked post may mean its text grew. */
+  private onMutations(records: MutationRecord[]): void {
+    this.scheduleScan();
+    const touched = new Set<HTMLElement>();
+    for (const r of records) {
+      // Most changes (timestamps, reaction counts, comments) cannot alter a post's text: drop them cheaply first.
+      if (!this.d.adapter.isPostTextChange(r)) continue;
+      for (let n: Node | null = r.target; n; n = n.parentNode) {
+        if (n.nodeType === 1 && this.posts.has(n as HTMLElement)) {
+          touched.add(n as HTMLElement);
+          break;
+        }
+      }
+    }
+    for (const el of touched) this.scheduleGrowthCheck(el);
+  }
+
+  private scheduleGrowthCheck(el: HTMLElement): void {
+    const st = this.posts.get(el);
+    if (!st || !(st.status === 'pending' || st.status === 'done' || st.status === 'skipped')) return;
+    const prev = this.growTimers.get(el);
+    if (prev) clearTimeout(prev);
+    this.growTimers.set(
+      el,
+      setTimeout(() => {
+        this.growTimers.delete(el);
+        void this.checkGrowth(el);
+      }, this.d.growthSettleMs ?? 400),
+    );
+  }
+
+  /**
+   * Re-judge a post whose extracted text grew ("…more"). Unchanged or shorter text ("…see less") changes nothing;
+   * marked posts are governed by the mark and are not re-judged. The longer text is classified once; the request for
+   * the old text is cancelled when nothing else waits for it, and its result is dropped if it still arrives.
+   */
+  private async checkGrowth(el: HTMLElement): Promise<void> {
+    const st = this.posts.get(el);
+    if (!st || !this.running) return;
+    if (!(st.status === 'pending' || st.status === 'done' || st.status === 'skipped')) return;
+    if (st.status === 'pending' && !st.fp) return this.scheduleGrowthCheck(el); // first look still in progress: retry
+    const extracted = this.d.adapter.extract(el);
+    if (!extracted) return;
+    const input = prepareInput(extracted.input);
+    if (st.input && inputLength(input) <= inputLength(st.input)) return; // unchanged or shorter
+    if (st.markFp && this.feedback.has(st.markFp)) return; // your mark stands
+    if ((st.rejudged ?? 0) >= MAX_REJUDGEMENTS) return; // the latest verdict stands: no unbounded LLM calls
+
+    // "You are reading it" only if the post was visible when it grew and you clicked inside it just before:
+    // not a page script, and not LinkedIn loading text into a post you cannot even see.
+    const view = this.viewFor(st);
+    const reading =
+      !(view && isCollapsedView(view)) && st.clickedAt !== undefined && this.now() - st.clickedAt <= USER_EXPAND_WINDOW_MS;
+    const epoch = this.epoch;
+    const before = { status: st.status, fp: st.fp };
+    st.status = 'pending'; // grew: busy from here
+    const fp = await fingerprint(input);
+    if (!this.stillCurrent(el, st, epoch)) return;
+    if (fp === st.fp) {
+      st.status = before.status; // longer only in ways the fingerprint ignores (case, spacing)
+      return;
+    }
+    if (before.status === 'pending' && before.fp && !this.othersWaitingFor(before.fp, el)) {
+      void this.d.send({ type: 'cancel', fp: before.fp }).catch(() => {});
+    }
+    st.fp = fp;
+    st.markFp ??= fp;
+    st.input = input;
+    st.rejudged = (st.rejudged ?? 0) + 1;
+    if (reading) st.keepVisible = true; // the user is reading it: a model verdict must not hide it
+    await this.classifyCurrent(el, st, fp, input, epoch);
+  }
+
+  /** Is another post on this page still waiting for the classification of this text? */
+  private othersWaitingFor(fp: string, except: HTMLElement): boolean {
+    for (const [el, st] of this.posts) if (el !== except && st.fp === fp && st.status === 'pending') return true;
+    return false;
+  }
 
   private scheduleScan(): void {
     if (this.scanTimer) return;
@@ -156,19 +285,28 @@ export class FeedController {
     for (const el of Array.from(this.posts.keys())) {
       if (!el.isConnected) {
         this.visibility?.unobserve(el);
+        clearTimeout(this.growTimers.get(el));
+        this.growTimers.delete(el);
         this.posts.delete(el);
       }
     }
     this.d.presenter.prune();
   }
 
-  private resetState(el: HTMLElement, st: PostState): void {
+  /** Forget the post's classification. `samePost` (LLM changed): keep what identifies the post, i.e. its mark key. */
+  private resetState(el: HTMLElement, st: PostState, opts: { samePost?: boolean } = {}): void {
     this.d.presenter.clear(el);
     st.status = 'new';
+    if (!opts.samePost) {
+      delete st.markFp;
+      delete st.clickedAt;
+      delete st.rejudged;
+    }
     delete st.fp;
     delete st.input;
     delete st.record;
     st.revealed = false;
+    delete st.keepVisible;
   }
 
   private onVisible(el: HTMLElement): void {
@@ -204,17 +342,37 @@ export class FeedController {
     const fp = await fingerprint(input);
     if (!this.stillCurrent(el, st, epoch)) return;
     st.fp = fp;
+    st.markFp ??= fp;
     st.input = input;
 
-    const known = this.classified.get(fp);
-    if (known || this.feedback.has(fp)) {
+    if (this.feedback.has(st.markFp)) {
+      // Marked: the user's verdict governs; no need to ask the model.
+      const known = this.classified.get(fp);
       if (known) st.record = known;
       st.status = 'done';
       this.render(el);
       return;
     }
+    await this.classifyCurrent(el, st, fp, input, epoch);
+  }
+
+  /**
+   * Classify the post's current text (first time, or after it grew). A verdict already known for this text, or a
+   * request already in flight for it, is reused. A result that arrives after the post's text moved on is dropped.
+   * Fails open: on any error, or while requests are paused, the post is left as LinkedIn drew it.
+   */
+  private async classifyCurrent(el: HTMLElement, st: PostState, fp: string, input: PostInput, epoch: number): Promise<void> {
+    const known = this.classified.get(fp);
+    if (known) {
+      st.record = known;
+      st.status = 'done';
+      this.render(el);
+      return;
+    }
     if (this.blocked) {
+      delete st.record; // a stale (cut-off) verdict must not stay on screen
       st.status = 'new'; // retried when settings change
+      this.render(el);
       return;
     }
 
@@ -228,7 +386,7 @@ export class FeedController {
       this.inflight.set(fp, pendingResult);
     }
     const result = await pendingResult;
-    if (!this.stillCurrent(el, st, epoch) || st.fp !== fp) return;
+    if (!this.stillCurrent(el, st, epoch) || st.fp !== fp) return; // the text moved on: drop this result
 
     if (result && result.ok) {
       const record: ClassificationRecord = { classification: result.classification, model: result.model, promptVersion: result.promptVersion };
@@ -238,8 +396,10 @@ export class FeedController {
       this.render(el);
       this.renderDuplicates(fp, el);
     } else {
-      // Fail open: the post simply stays as LinkedIn rendered it.
+      // Fail open: the post stays as LinkedIn rendered it (and loses any verdict for an earlier, shorter text).
+      delete st.record;
       st.status = 'failed';
+      this.render(el);
       if (result && !result.ok && BLOCKING.has(result.kind)) this.blocked = true;
     }
   }
@@ -253,7 +413,7 @@ export class FeedController {
   private viewFor(st: PostState): View | null {
     if (!this.settings) return null;
     const review = this.settings.mode === 'review';
-    const verdict = st.fp ? this.feedback.get(st.fp) : undefined;
+    const verdict = st.markFp ? this.feedback.get(st.markFp) : undefined;
     if (verdict) {
       return {
         outcome: verdict === 'keep' ? 'keep' : 'collapse',
@@ -266,6 +426,12 @@ export class FeedController {
     const c = st.record?.classification;
     if (!c) return null;
     const r = decide(c, { sensitivity: this.settings.sensitivity, highlightEnabled: this.settings.highlight });
+    // A model verdict never hides a post you revealed, or (Active mode) expanded to read. That only matters when the
+    // verdict is collapse: otherwise there is nothing to keep visible, and no "Collapsed by Signal" bar.
+    // Only in Active mode: Review mode hides nothing by itself, so it shows its normal annotation (the flags are kept,
+    // so switching back to Active does not hide the post behind your back).
+    const visibleBecause = review ? undefined : st.revealed ? 'revealed' : st.keepVisible ? 'expanded' : undefined;
+    const keptVisible = r.outcome === 'collapse' && visibleBecause !== undefined;
     return {
       outcome: r.outcome,
       source: 'model',
@@ -273,7 +439,8 @@ export class FeedController {
       modelDecision: r.modelDecision,
       confidence: c.confidence,
       review,
-      revealed: st.revealed,
+      revealed: keptVisible,
+      ...(keptVisible ? { visibleBecause } : {}),
     };
   }
 
@@ -309,13 +476,14 @@ export class FeedController {
     const st = this.posts.get(el);
     if (!st) return;
     st.revealed = revealed;
+    if (!revealed) delete st.keepVisible; // "Hide" / "Hide again": the user wants it out of the way
     this.render(el);
   }
 
   private giveFeedback(el: HTMLElement, verdict: Verdict | null): void {
     const st = this.posts.get(el);
     if (!st?.fp || !st.input) return;
-    const fp = st.fp;
+    const fp = st.markFp ?? st.fp;
     const previous = this.feedback.get(fp) ?? null;
     this.applyOverride(fp, verdict);
     const rec = verdict === null ? undefined : st.record;
@@ -341,7 +509,7 @@ export class FeedController {
     if (verdict === null) this.feedback.delete(fp);
     else this.feedback.set(fp, verdict);
     for (const [other, s] of this.posts) {
-      if (s.fp === fp) {
+      if ((s.markFp ?? s.fp) === fp) {
         s.revealed = false;
         this.render(other);
       }

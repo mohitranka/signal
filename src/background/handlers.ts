@@ -15,7 +15,7 @@ export interface HandlerDeps {
   notifyTabs: () => void;
 }
 
-const CONTENT_TYPES = new Set(['classify', 'cancelAll', 'getState', 'setFeedback']);
+const CONTENT_TYPES = new Set(['classify', 'cancelAll', 'cancel', 'getState', 'setFeedback']);
 
 const invalid = (message: string): ClassifyResult => ({ ok: false, kind: 'invalid', message });
 
@@ -25,7 +25,8 @@ const invalid = (message: string): ClassifyResult => ({ ok: false, kind: 'invali
  * connection tests, or feedback export.
  */
 export function createHandler(d: HandlerDeps) {
-  return async function handle(msg: BackgroundMessage, fromContent: boolean): Promise<unknown> {
+  /** `waiter` identifies the sender (see waiterIdOf) so `cancel` only releases that sender's own interest. */
+  return async function handle(msg: BackgroundMessage, fromContent: boolean, waiter = 'unknown'): Promise<unknown> {
     if (fromContent && !CONTENT_TYPES.has(msg.type)) return { error: 'forbidden' };
 
     switch (msg.type) {
@@ -36,10 +37,14 @@ export function createHandler(d: HandlerDeps) {
         if (!isPostInput(msg.input)) return invalid('Malformed post input.');
         const input = prepareInput(msg.input);
         if (typeof msg.fp !== 'string' || msg.fp !== (await fingerprint(input))) return invalid('Fingerprint does not match the post.');
-        return d.service.classify(msg.fp, input);
+        return d.service.classify(msg.fp, input, waiter);
       }
       case 'cancelAll':
         d.service.cancelAll();
+        return { ok: true };
+      case 'cancel':
+        if (typeof msg.fp !== 'string' || !FP_PATTERN.test(msg.fp)) return { error: 'bad fingerprint' };
+        await d.service.cancel(msg.fp, waiter);
         return { ok: true };
       case 'getState': {
         // Feedback trouble (e.g. storage errors) must not stop the feed from working: fall back to no corrections.

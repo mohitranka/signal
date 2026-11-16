@@ -35,11 +35,29 @@ export interface FeedAdapter {
   findPosts(root: ParentNode): HTMLElement[];
   postId(el: HTMLElement): string | null;
   extract(el: HTMLElement): ExtractedPost | null;
+  /**
+   * Could this page change have altered a post's extracted text (its body, reshared text or link preview)?
+   * Cheap, and called for every change on the page, so that timestamps, reaction counts and comments are ignored.
+   */
+  isPostTextChange(record: MutationRecord): boolean;
 }
 
 /** Route check for "the main feed". Kept here because it is LinkedIn URL knowledge. */
 export function isFeedRoute(loc: Pick<Location, 'pathname'>): boolean {
   return /^\/feed\/?$/.test(loc.pathname);
+}
+
+/** Everything extract() reads text from. */
+const TEXT_AREA = `${SEL.textBox}, ${SEL.linkTitle}, ${SEL.linkDescription}`;
+const COMMENTS = '.comments-comments-list, .comments-comment-item';
+
+/** Is this element inside a post's text area, and not inside its comments? Native selector matching only. */
+function inPostTextArea(el: Element): boolean {
+  const area = el.closest(TEXT_AREA);
+  if (!area || area.closest(COMMENTS)) return false;
+  // SDUI comments are list items nested inside the post's own list item.
+  const item = area.closest('[role="listitem"]');
+  return !(item && item.parentElement?.closest('[role="listitem"]'));
 }
 
 const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4']);
@@ -96,6 +114,19 @@ export const linkedinAdapter: FeedAdapter = {
 
   postId(el) {
     return el.getAttribute('data-urn') ?? el.querySelector('[data-urn]')?.getAttribute('data-urn') ?? el.getAttribute('componentkey');
+  },
+
+  isPostTextChange(record) {
+    const target = record.target.nodeType === 1 ? (record.target as Element) : record.target.parentElement;
+    if (target && inPostTextArea(target)) return true;
+    // LinkedIn may replace a whole text container: then the change targets the post, and the added node holds the text.
+    if (record.type !== 'childList') return false;
+    for (const n of Array.from(record.addedNodes)) {
+      if (n.nodeType !== 1) continue;
+      const el = n as Element;
+      if (el.matches(TEXT_AREA) ? inPostTextArea(el) : Array.from(el.querySelectorAll(TEXT_AREA)).some(inPostTextArea)) return true;
+    }
+    return false;
   },
 
   extract(el) {

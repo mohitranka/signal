@@ -122,6 +122,27 @@ describe('other bars are unchanged', () => {
   });
 });
 
+describe('a post kept visible because you expanded it', () => {
+  it('says Signal would collapse it and offers Hide (it was never hidden, so not "Hide again")', () => {
+    const a = actions();
+    presenter.apply(post, view({ outcome: 'collapse', review: false, revealed: true, visibleBecause: 'expanded', reason: 'Turns into bait' }), a);
+    expect(post.hasAttribute('data-signal-hidden')).toBe(false);
+    expect(bar().querySelector('.label')!.textContent).toBe('Signal would collapse this');
+    expect(bar().querySelector('.reason')!.textContent).toBe('Turns into bait');
+    expect(buttons()).toEqual(['Hide', 'Worth keeping']);
+    bar().querySelectorAll('button')[0]!.click();
+    expect(a.hide).toHaveBeenCalledTimes(1);
+  });
+
+  it('a revealed post keeps today\'s wording', () => {
+    for (const visibleBecause of ['revealed', undefined] as const) {
+      presenter.apply(post, view({ outcome: 'collapse', review: false, revealed: true, ...(visibleBecause ? { visibleBecause } : {}), reason: 'Bait' }), actions());
+      expect(bar().querySelector('.label')!.textContent).toBe('Collapsed by Signal');
+      expect(buttons()).toEqual(['Hide again', 'Worth keeping']);
+    }
+  });
+});
+
 describe('content.css', () => {
   const css = readFileSync('public/content.css', 'utf8');
   it('still hides collapsed posts and marks highlighted ones via the same attributes', () => {
