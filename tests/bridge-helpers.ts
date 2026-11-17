@@ -2,10 +2,11 @@
  * Helpers for the bridge tests (docs/implementation-plan-bridge.md): fake CLIs on PATH, Signal's exact request body,
  * and raw HTTP requests (Host and Origin must be settable, which fetch forbids).
  */
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, constants, copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { buildMessages } from '../src/classifier/prompt';
 import type { PostInput } from '../src/shared/types';
 
@@ -44,12 +45,34 @@ export interface Fakes {
   cleanup(): void;
 }
 
+/**
+ * A private copy of the running node, for the fakes' `#!/usr/bin/env node`. Security B1 refuses an interpreter in a
+ * group-writable folder, and Homebrew's /opt/homebrew/bin and Cellar are group-writable (admin) by default, so the
+ * system node would make every bridge test fail on such a Mac. One copy per test worker (an instant clone on APFS).
+ */
+let privateNode = '';
+function safeNode(): string {
+  if (privateNode) return privateNode;
+  const dir = mkdtempSync(join(tmpdir(), 'signal-node-'));
+  const node = join(dir, 'node');
+  const real = realpathSync(process.execPath);
+  copyFileSync(real, node, constants.COPYFILE_FICLONE);
+  chmodSync(node, 0o755);
+  // A shared-library build (Homebrew's) loads @rpath/libnode.*.dylib from ../lib or its own folder: copy it alongside.
+  const lib = join(dirname(real), '..', 'lib');
+  if (existsSync(lib)) for (const f of readdirSync(lib)) if (/^libnode\./.test(f)) copyFileSync(join(lib, f), join(dir, f), constants.COPYFILE_FICLONE);
+  process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
+  execFileSync(node, ['-e', '0']); // macOS verifies a new binary on first run (~1 s): pay it here, not inside a test's timeout
+  return (privateNode = node);
+}
+
 export function installFakes(behaviour: FakeBehaviour = {}): Fakes {
-  const dir = mkdtempSync(join(tmpdir(), 'signal-fake-cli-'));
+  const dir = mkdtempSync(join(realpathSync(tmpdir()), 'signal-fake-cli-')); // real path: on macOS /var is a link to /private/var
   for (const name of ['claude', 'codex']) {
     copyFileSync('tests/fixtures/fake-cli.cjs', join(dir, name));
     chmodSync(join(dir, name), 0o755);
   }
+  symlinkSync(safeNode(), join(dir, 'node')); // first on PATH, so `env node` finds it
   const set = (b: FakeBehaviour) => writeFileSync(join(dir, 'behaviour.json'), JSON.stringify(b));
   set(behaviour);
   const lines = (f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean) : []);

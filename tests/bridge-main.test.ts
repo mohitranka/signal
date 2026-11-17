@@ -11,6 +11,7 @@ import { build } from 'esbuild';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseArgs } from '../bridge/config';
 import { startBridge, type BridgeIO } from '../bridge/main';
+import { fitLine } from '../bridge/log';
 import { selfTest } from '../bridge/selftest';
 import { POST, eventually, installFakes, send, signalBody, type FakeBehaviour, type Fakes } from './bridge-helpers';
 
@@ -203,7 +204,7 @@ describe('which CLI runs (security B1)', () => {
     const note = lines.findIndex((l) => l.startsWith('  note: ignored '));
     expect(lines[note]).toBe('  note: ignored ~/parent/node_modules/.bin/claude (npm folder)');
     expect(lines[note + 1]).toMatch(/^ {2}claude 2\.1\.4 \.+ found$/);
-    expect(lines[note + 2]).toBe(`    ${join(fakes.dir, 'claude')}`);
+    expect(lines[note + 2]).toBe(fitLine('    ', join(fakes.dir, 'claude'))); // shortened from the left if the temp folder is long (macOS)
   });
 
   it('only an npm-folder claude: the note, "not found", why, exit 1', async () => {

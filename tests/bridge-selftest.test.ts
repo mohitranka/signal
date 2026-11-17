@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ADAPTERS } from '../bridge/adapters';
 import { resolveCommand, scrubEnv } from '../bridge/runner';
-import { pathLines } from '../bridge/log';
+import { fitLine, pathLines } from '../bridge/log';
 import { selfTest } from '../bridge/selftest';
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -138,8 +138,8 @@ describe('where the CLI is (security B1)', () => {
     const { all, result } = await check('claude');
     expect(result.ok).toBe(true);
     const i = all.findIndex((l) => / found$/.test(l));
-    expect(all[i + 1]).toBe(`    ${join(fakes.dir, 'claude')}`);
-    expect(all[i + 2]).toMatch(/^ {4}runs with \/.*\/node$/);
+    expect(all[i + 1]).toBe(fitLine('    ', join(fakes.dir, 'claude'))); // shortened from the left if the temp folder is long (macOS)
+    expect(all[i + 2]).toMatch(/^ {4}runs with [/…].*\/node$/); // … : shortened from the left (long macOS temp folder)
     expect(all[i + 3]).toMatch(/^  required flags /);
     if (result.ok) expect(result.identity).toContain(join(fakes.dir, 'claude'));
   });
@@ -150,8 +150,8 @@ describe('where the CLI is (security B1)', () => {
     expect(result.ok).toBe(false);
     expect(all).toEqual([
       '  claude ............................. unsafe location',
-      `    ${join(fakes.dir, 'claude')}`,
-      `    ${fakes.dir} is writable by other users`,
+      fitLine('    ', join(fakes.dir, 'claude')),
+      fitLine('    ', `${fakes.dir} is writable by other users`),
       'Not starting. Others could replace this claude. Install it where only',
       'you or root can change it (for example with its own installer).',
     ]);

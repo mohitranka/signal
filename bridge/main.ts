@@ -5,6 +5,7 @@
  */
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
+import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { PostInput } from '../src/shared/types';
 import { ADAPTERS } from './adapters';
@@ -173,8 +174,9 @@ export async function startBridge(argv: string[], io: BridgeIO): Promise<Started
   };
 }
 
-// Run when executed directly (the npm script runs the bundle), not when imported by tests.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Run when executed directly (the npm script runs the bundle), not when imported by tests. Real path: import.meta.url
+// has symlinks resolved and argv[1] does not (macOS /var → /private/var, or a project folder reached through a link).
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const started = await startBridge(process.argv.slice(2), { env: process.env, out: (l) => console.log(l) });
   if (!started.ok) process.exit(started.code);
   let stopping = false;
