@@ -1,4 +1,6 @@
-import { DECISIONS, SIGNAL_NAMES, type Classification, type ClassificationRecord, type Decision, type Signals } from '../shared/types';
+import { FP_PATTERN } from '../shared/feedback';
+import { REPEAT_THRESHOLD } from '../shared/similarity';
+import { DECISIONS, SIGNAL_NAMES, type Classification, type ClassificationRecord, type Decision, type RepeatOf, type Signals } from '../shared/types';
 
 export class ParseError extends Error {}
 
@@ -57,10 +59,11 @@ export function coerceClassification(obj: unknown): Classification {
 const MAX_MODEL_LENGTH = 200;
 const MAX_PROMPT_VERSION_LENGTH = 32;
 /**
- * C0/C1 control characters and bidi controls (LRM/RLM, embeddings/overrides, isolates). They have no place in a
- * model name or prompt version, and can spoof what is displayed or inject terminal escapes when printed.
+ * C0/C1 control characters and all 12 Unicode bidi formatting characters (ALM, LRM/RLM, embeddings/overrides,
+ * isolates). They have no place in a model name or prompt version, and can spoof what is displayed or inject terminal
+ * escapes when printed.
  */
-export const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
+export const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
 const UNSAFE_TEXT_ALL = new RegExp(UNSAFE_TEXT.source, 'g');
 /** Replace unsafe characters (see UNSAFE_TEXT) with "?" before printing untrusted text. */
 export const printable = (s: string): string => s.replace(UNSAFE_TEXT_ALL, '?');
@@ -77,9 +80,24 @@ export function parseRecord(x: unknown): ClassificationRecord | null {
   if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
   const r = x as Record<string, unknown>;
   if (!shortString(r.model, MAX_MODEL_LENGTH) || !shortString(r.promptVersion, MAX_PROMPT_VERSION_LENGTH)) return null;
+  let classification: Classification;
   try {
-    return { classification: coerceClassification(r.classification), model: r.model, promptVersion: r.promptVersion };
+    classification = coerceClassification(r.classification);
   } catch {
     return null;
   }
+  const repeatOf = parseRepeatOf(r.repeatOf);
+  return { classification, model: r.model, promptVersion: r.promptVersion, ...(repeatOf ? { repeatOf } : {}) };
+}
+
+/**
+ * Validate "copied from a similar post" information from an untrusted source. A malformed value is dropped (the
+ * record stays valid: it is then treated as the post's own verdict). Returns a clean copy.
+ */
+export function parseRepeatOf(x: unknown): RepeatOf | null {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+  const r = x as Record<string, unknown>;
+  if (typeof r.fp !== 'string' || !FP_PATTERN.test(r.fp)) return null;
+  if (!isNum(r.similarity) || r.similarity < REPEAT_THRESHOLD || r.similarity > 1) return null;
+  return { fp: r.fp, similarity: r.similarity };
 }

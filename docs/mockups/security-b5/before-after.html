@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Signal bridge · security B5 · terminal mockup</title>
+<style>
+body{margin:0;background:#e9ebee;font:13px/1.5 system-ui;padding:20px;width:max-content}
+h3{margin:16px 0 6px;font-size:13px;color:#333}
+/* an 80-column terminal: 80ch wide content box, so any line over 80 columns would visibly overflow */
+.pair{display:flex;gap:18px;align-items:flex-start}.col h3{font-size:12px;margin:0 0 4px;color:#333}.t{background:#15171a;color:#d7dce2;border-radius:10px;padding:14px 18px;font:12.5px/1.55 'DejaVu Sans Mono',ui-monospace,Menlo,monospace;white-space:pre;width:80ch;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.ok{color:#5cbfa8}.bad{color:#ff8a80}.dim{color:#7d8590}.warn{color:#f2c46d}.b{color:#fff;font-weight:700}
+.new{position:relative}.new::before{content:"";position:absolute;left:-12px;top:.1em;bottom:.1em;width:3px;border-radius:2px;background:#f2c46d}
+@media (forced-colors: active){.new::before{background:CanvasText}}
+</style>
+<main><h1 style="font-size:15px;margin:0 0 4px">Signal bridge · security B5 · today (recorded) and after (mockup)</h1>
+<p style="margin:0 0 6px;color:#444">Left: the real output of today's bridge, recorded by running it (paths shortened, nothing else changed). Right: the mockup. Yellow bar: new or changed lines (mockup only). Versions, paths and times are illustrative.</p>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">1 · A call cannot be prepared (its temporary folder was removed while the bridge ran)</h2>
+<div class="pair"><div class="col"><h3>Today (recorded): request 2 gets 500, then the process ends (request 3: no connection)</h3><div class="t">10:54:14  classify  ok     0.0 s    812 in /   70 out  queue 0
+10:54:14  rejected  500   internal error
+node:fs:3049
+  return binding.mkdtemp(prefix, options.encoding);
+                 ^
+Error: ENOENT: no such file or directory, mkdtemp '&lt;tmp&gt;/signal-bridge-XXXXXX'
+    at mkdtempSync (node:fs:3049:18)
+    at CliRunner.runIn (.eval-build/bridge.mjs:655:17)
+    at CliRunner.run (.eval-build/bridge.mjs:651:17)
+    at Object.run (.eval-build/bridge.mjs:1283:29)
+    at Object.task (.eval-build/bridge.mjs:1124:34)
+    at TaskQueue.pump (.eval-build/bridge.mjs:927:9)
+    at TaskQueue.run (.eval-build/bridge.mjs:889:10)
+    at handle (.eval-build/bridge.mjs:1119:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'mkdtemp',
+  path: '&lt;tmp&gt;/signal-bridge-XXXXXX'
+}
+Node.js v22.21.0</div></div><div class="col"><h3>After (mockup): 502 with a reason; the bridge keeps serving</h3><div class="t"><span class="dim">12:39:58</span>  classify  <span class="ok">ok</span>     3.8 s    812 in /   74 out  queue 0
+<span class="new"><span class="dim">12:40:05</span>  classify  <span class="bad">502</span>    0.0 s  not prepared (ENOSPC)  queue 0</span>
+<span class="dim">12:41:30</span>  classify  <span class="ok">ok</span>     4.1 s    790 in /   71 out  queue 0</div></div></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">3 · Start without a usable temporary folder</h2>
+<div class="pair"><div class="col"><h3>Today (recorded): a JavaScript stack trace, exit code 1</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+Signal bridge · local CLI bridge · classification only
+node:fs:3049
+  return binding.mkdtemp(prefix, options.encoding);
+                 ^
+Error: ENOENT: no such file or directory, mkdtemp '/nonexistent-tmp/signal-bridge-XXXXXX'
+    at mkdtempSync (node:fs:3049:18)
+    at probe (.eval-build/bridge.mjs:721:15)
+    at selfTest (.eval-build/bridge.mjs:745:29)
+    at checks (.eval-build/bridge.mjs:1253:24)
+    at startBridge (.eval-build/bridge.mjs:1254:23)
+    at .eval-build/bridge.mjs:1320:25
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'mkdtemp',
+  path: '/nonexistent-tmp/signal-bridge-XXXXXX'
+}</div></div><div class="col"><h3>After (mockup): one sentence, exit code 1</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> Could not prepare a temporary folder (ENOSPC).</span></div></div></div>
+</main>

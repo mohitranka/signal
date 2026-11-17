@@ -22,3 +22,24 @@ describe('popup bundle', () => {
     expect(js).not.toMatch(/from\s*["']node:|require\(["']node:|readFileSync/);
   });
 });
+
+describe('signature code ships only where signatures are computed (T12)', () => {
+  // Signatures are computed in the background from input it has re-validated; a content script never sends one.
+  const MARKERS = ['function signature(', 'function encodeSignature(', 'SIGNATURE_VERSION'];
+
+  it('the service worker contains it exactly once', () => {
+    const js = bundle('src/background/service-worker.ts');
+    expect(count(js, 'function signature(')).toBe(1);
+    expect(count(js, 'function similarity(')).toBe(1);
+  });
+
+  it('the content script does not contain it', () => {
+    const js = bundle('src/content/index.ts');
+    for (const m of MARKERS) expect(count(js, m), m).toBe(0);
+  });
+
+  it('the popup does not contain it', () => {
+    const js = bundle('src/popup/popup.ts');
+    for (const m of MARKERS) expect(count(js, m), m).toBe(0);
+  });
+});

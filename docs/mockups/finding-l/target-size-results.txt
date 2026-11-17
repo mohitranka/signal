@@ -1,0 +1,6 @@
+POPUP (all sections open)
+  enabled                  input    38x22  spacing exception holds
+  highlight                input    32x18  spacing exception holds
+  Advanced                 summary  306x17  spacing exception holds
+  repeats                  input    32x18  spacing exception holds
+  cacheReset               button   71x17  spacing exception holds

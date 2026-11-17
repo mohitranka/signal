@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   jsonMode: true,
   inputPricePerM: null,
   outputPricePerM: null,
+  repeats: true,
 };
 
 const clampInt = (v: unknown, min: number, max: number, fallback: number): number =>
@@ -44,6 +45,7 @@ export function normalizeSettings(raw: unknown): Settings {
     jsonMode: bool('jsonMode', d.jsonMode),
     inputPricePerM: price(r.inputPricePerM),
     outputPricePerM: price(r.outputPricePerM),
+    repeats: bool('repeats', d.repeats),
   };
 }
 
@@ -52,7 +54,8 @@ export function toPublic(s: Settings): PublicSettings {
   return { ...rest, hasApiKey: apiKey.length > 0 };
 }
 
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+/** This computer: where plain http is allowed, and where the local CLI bridge can be (security B7). */
+export const LOCAL_HOSTS: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /** Returns a human-readable problem, or null if the LLM settings are usable. */
 export function configProblem(s: Pick<Settings, 'endpoint' | 'model' | 'apiKey'>): string | null {

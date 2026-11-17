@@ -1,0 +1,12 @@
+ok   remote-today     light dejavu     chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»
+FAIL remote-after     light dejavu     chip «sonnet» · cost «$0.0070» · key «API key» · prices editable · status «…n 812 ms (test post rated: keep)» cut ['stCost']
+ok   bridge-unchanged light dejavu     chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»
+ok   remote-today     light liberation chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»
+ok   remote-after     light liberation chip «sonnet» · cost «$0.0070» · key «API key» · prices editable · status «…n 812 ms (test post rated: keep)»
+ok   bridge-unchanged light liberation chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»
+ok   remote-today     dark  dejavu     chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»
+FAIL remote-after     dark  dejavu     chip «sonnet» · cost «$0.0070» · key «API key» · prices editable · status «…n 812 ms (test post rated: keep)» cut ['stCost']
+ok   bridge-unchanged dark  dejavu     chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»
+ok   remote-today     dark  liberation chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»
+ok   remote-after     dark  liberation chip «sonnet» · cost «$0.0070» · key «API key» · prices editable · status «…n 812 ms (test post rated: keep)»
+ok   bridge-unchanged dark  liberation chip «claude-code · sonnet» · cost «Plan» · key «Bridge token» · prices disabled · status «…ep) · via your Claude Code login»

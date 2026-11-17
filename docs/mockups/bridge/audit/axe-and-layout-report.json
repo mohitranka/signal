@@ -1,0 +1,534 @@
+{
+ "popup · light · DejaVu Sans (wide, this machine default)": {
+  "overflow": {
+   "bodyOverflow": 15,
+   "clipped": []
+  },
+  "axe": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "nodes": [
+     {
+      "target": ".tile:nth-child(1) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>classified</span>"
+     },
+     {
+      "target": ".tile:nth-child(2) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>cache hits</span>"
+     },
+     {
+      "target": ".tile:nth-child(3) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>repeats</span>"
+     },
+     {
+      "target": ".tile:nth-child(4) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>tokens</span>"
+     },
+     {
+      "target": ".err:nth-child(1)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">network: Could not reach the bridge at 127.0.0.1:8791. Is it"
+     },
+     {
+      "target": ".err:nth-child(1) > code",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<code>npm run bridge -- --cli claude</code>"
+     },
+     {
+      "target": ".err:nth-child(2)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">auth: Authentication failed (401). Paste the token printed b"
+     },
+     {
+      "target": ".err:nth-child(3)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">config: Request rejected (400). This bridge serves claude-co"
+     },
+     {
+      "target": ".err:nth-child(4)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">rate_limit: The bridge is busy (one post at a time); Signal "
+     }
+    ]
+   },
+   {
+    "id": "landmark-no-duplicate-main",
+    "impact": "moderate",
+    "help": "Document should not have more than one main landmark",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "Document has more than one main landmark",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "landmark-unique",
+    "impact": "moderate",
+    "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "help": "All page content should be contained by landmarks",
+    "nodes": [
+     {
+      "target": ".caption:nth-child(1)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">A · Connected through the bridge</p>"
+     },
+     {
+      "target": ".caption:nth-child(4)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">B · Errors the bridge can report (through Test connection)</p>"
+     }
+    ]
+   }
+  ],
+  "focus": [
+   {
+    "tag": "input",
+    "type": "checkbox",
+    "label": "",
+    "visible": true
+   },
+   {
+    "tag": "summary",
+    "type": "",
+    "label": "Modelclaude-code · sonnet",
+    "visible": true
+   },
+   {
+    "tag": "select",
+    "type": "select-one",
+    "label": "Provider Local CLI bridge (Claude Code /",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "url",
+    "label": "Endpoint",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "text",
+    "label": "Model",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "password",
+    "label": "Bridge token",
+    "visible": true
+   },
+   {
+    "tag": "summary",
+    "type": "",
+    "label": "Advanced",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "number",
+    "label": "Concurrency",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "number",
+    "label": "Timeout (s)",
+    "visible": true
+   },
+   {
+    "tag": "button",
+    "type": "button",
+    "label": "Save",
+    "visible": true
+   },
+   {
+    "tag": "button",
+    "type": "button",
+    "label": "Test connection",
+    "visible": true
+   },
+   {
+    "tag": "button",
+    "type": "button",
+    "label": "Clear cache",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "checkbox",
+    "label": "",
+    "visible": true
+   },
+   {
+    "tag": "summary",
+    "type": "",
+    "label": "Modelclaude-code · sonnet",
+    "visible": true
+   },
+   {
+    "tag": "select",
+    "type": "select-one",
+    "label": "Provider Local CLI bridge (Claude Code /",
+    "visible": true
+   }
+  ]
+ },
+ "popup · dark · DejaVu Sans (wide, this machine default)": {
+  "overflow": {
+   "bodyOverflow": 15,
+   "clipped": []
+  },
+  "axe": [
+   {
+    "id": "landmark-no-duplicate-main",
+    "impact": "moderate",
+    "help": "Document should not have more than one main landmark",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "Document has more than one main landmark",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "landmark-unique",
+    "impact": "moderate",
+    "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "help": "All page content should be contained by landmarks",
+    "nodes": [
+     {
+      "target": ".caption:nth-child(1)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">A · Connected through the bridge</p>"
+     },
+     {
+      "target": ".caption:nth-child(4)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">B · Errors the bridge can report (through Test connection)</p>"
+     }
+    ]
+   }
+  ],
+  "focus": []
+ },
+ "terminal · DejaVu Sans (wide, this machine default)": {
+  "overflow": {
+   "bodyOverflow": 31,
+   "clipped": []
+  },
+  "terminalBoxes": [
+   {
+    "box": 1,
+    "content": 896,
+    "visible": 896
+   },
+   {
+    "box": 2,
+    "content": 896,
+    "visible": 896
+   },
+   {
+    "box": 3,
+    "content": 896,
+    "visible": 896
+   }
+  ]
+ },
+ "popup · light · Liberation Sans (Arial metrics ≈ Segoe UI / Helvetica)": {
+  "overflow": {
+   "bodyOverflow": 15,
+   "clipped": []
+  },
+  "axe": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "nodes": [
+     {
+      "target": ".tile:nth-child(1) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>classified</span>"
+     },
+     {
+      "target": ".tile:nth-child(2) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>cache hits</span>"
+     },
+     {
+      "target": ".tile:nth-child(3) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>repeats</span>"
+     },
+     {
+      "target": ".tile:nth-child(4) > span",
+      "summary": "Element has insufficient color contrast of 4.46 (foreground color: #68707a, background color: #f0f2f4, font size: 8.3pt (11px), font weight: normal). ",
+      "html": "<span>tokens</span>"
+     },
+     {
+      "target": ".err:nth-child(1)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">network: Could not reach the bridge at 127.0.0.1:8791. Is it"
+     },
+     {
+      "target": ".err:nth-child(1) > code",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<code>npm run bridge -- --cli claude</code>"
+     },
+     {
+      "target": ".err:nth-child(2)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">auth: Authentication failed (401). Paste the token printed b"
+     },
+     {
+      "target": ".err:nth-child(3)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">config: Request rejected (400). This bridge serves claude-co"
+     },
+     {
+      "target": ".err:nth-child(4)",
+      "summary": "Element has insufficient color contrast of 4.35 (foreground color: #c2413a, background color: #fbe9e7, font size: 9.0pt (12px), font weight: normal). ",
+      "html": "<p id=\"llmStatus\" class=\"err\">rate_limit: The bridge is busy (one post at a time); Signal "
+     }
+    ]
+   },
+   {
+    "id": "landmark-no-duplicate-main",
+    "impact": "moderate",
+    "help": "Document should not have more than one main landmark",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "Document has more than one main landmark",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "landmark-unique",
+    "impact": "moderate",
+    "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "help": "All page content should be contained by landmarks",
+    "nodes": [
+     {
+      "target": ".caption:nth-child(1)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">A · Connected through the bridge</p>"
+     },
+     {
+      "target": ".caption:nth-child(4)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">B · Errors the bridge can report (through Test connection)</p>"
+     }
+    ]
+   }
+  ],
+  "focus": [
+   {
+    "tag": "input",
+    "type": "checkbox",
+    "label": "",
+    "visible": true
+   },
+   {
+    "tag": "summary",
+    "type": "",
+    "label": "Modelclaude-code · sonnet",
+    "visible": true
+   },
+   {
+    "tag": "select",
+    "type": "select-one",
+    "label": "Provider Local CLI bridge (Claude Code /",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "url",
+    "label": "Endpoint",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "text",
+    "label": "Model",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "password",
+    "label": "Bridge token",
+    "visible": true
+   },
+   {
+    "tag": "summary",
+    "type": "",
+    "label": "Advanced",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "number",
+    "label": "Concurrency",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "number",
+    "label": "Timeout (s)",
+    "visible": true
+   },
+   {
+    "tag": "button",
+    "type": "button",
+    "label": "Save",
+    "visible": true
+   },
+   {
+    "tag": "button",
+    "type": "button",
+    "label": "Test connection",
+    "visible": true
+   },
+   {
+    "tag": "button",
+    "type": "button",
+    "label": "Clear cache",
+    "visible": true
+   },
+   {
+    "tag": "input",
+    "type": "checkbox",
+    "label": "",
+    "visible": true
+   },
+   {
+    "tag": "summary",
+    "type": "",
+    "label": "Modelclaude-code · sonnet",
+    "visible": true
+   },
+   {
+    "tag": "select",
+    "type": "select-one",
+    "label": "Provider Local CLI bridge (Claude Code /",
+    "visible": true
+   }
+  ]
+ },
+ "popup · dark · Liberation Sans (Arial metrics ≈ Segoe UI / Helvetica)": {
+  "overflow": {
+   "bodyOverflow": 15,
+   "clipped": []
+  },
+  "axe": [
+   {
+    "id": "landmark-no-duplicate-main",
+    "impact": "moderate",
+    "help": "Document should not have more than one main landmark",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "Document has more than one main landmark",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "landmark-unique",
+    "impact": "moderate",
+    "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+    "nodes": [
+     {
+      "target": "main:nth-child(3)",
+      "summary": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable",
+      "html": "<main>"
+     }
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "help": "All page content should be contained by landmarks",
+    "nodes": [
+     {
+      "target": ".caption:nth-child(1)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">A · Connected through the bridge</p>"
+     },
+     {
+      "target": ".caption:nth-child(4)",
+      "summary": "Some page content is not contained by landmarks",
+      "html": "<p class=\"caption\">B · Errors the bridge can report (through Test connection)</p>"
+     }
+    ]
+   }
+  ],
+  "focus": []
+ },
+ "terminal · Liberation Sans (Arial metrics ≈ Segoe UI / Helvetica)": {
+  "overflow": {
+   "bodyOverflow": 31,
+   "clipped": []
+  },
+  "terminalBoxes": [
+   {
+    "box": 1,
+    "content": 896,
+    "visible": 896
+   },
+   {
+    "box": 2,
+    "content": 896,
+    "visible": 896
+   },
+   {
+    "box": 3,
+    "content": 896,
+    "visible": 896
+   }
+  ]
+ }
+}

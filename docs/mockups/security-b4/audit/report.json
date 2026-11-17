@@ -1,0 +1,374 @@
+{
+ "DejaVu Sans Mono": {
+  "measure": {
+   "boxes": [
+    {
+     "box": 1,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 311.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 311.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 311.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 311.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 311.5
+      }
+     ]
+    },
+    {
+     "box": 2,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 311.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 311.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 311.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 311.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 311.5
+      }
+     ]
+    },
+    {
+     "box": 3,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "codex 0.58.0 .................",
+       "x": 311.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 311.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 311.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 311.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 311.5
+      }
+     ]
+    },
+    {
+     "box": 4,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "codex 0.58.0 .................",
+       "x": 311.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 311.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 311.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 311.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 311.5
+      }
+     ]
+    },
+    {
+     "box": 5,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 70,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 311.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 311.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 311.5
+      }
+     ]
+    },
+    {
+     "box": 6,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 70,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 311.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 311.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 311.5
+      }
+     ]
+    }
+   ],
+   "glyphs": [
+    {
+     "ch": "\u00b7",
+     "code": "U+00B7",
+     "ratio": 1
+    },
+    {
+     "ch": "\u2192",
+     "code": "U+2192",
+     "ratio": 1
+    },
+    {
+     "ch": "\u201c",
+     "code": "U+201C",
+     "ratio": 1
+    },
+    {
+     "ch": "\u201d",
+     "code": "U+201D",
+     "ratio": 1
+    }
+   ],
+   "cell": 7.52578125
+  },
+  "contrastScan": [],
+  "axe": {
+   "violations": [],
+   "incomplete": []
+  }
+ },
+ "Liberation Mono": {
+  "measure": {
+   "boxes": [
+    {
+     "box": 1,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 310.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 310.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 310.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 310.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 310.5
+      }
+     ]
+    },
+    {
+     "box": 2,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 310.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 310.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 310.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 310.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 310.5
+      }
+     ]
+    },
+    {
+     "box": 3,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "codex 0.58.0 .................",
+       "x": 310.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 310.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 310.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 310.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 310.5
+      }
+     ]
+    },
+    {
+     "box": 4,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 75,
+     "values": [
+      {
+       "line": "codex 0.58.0 .................",
+       "x": 310.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 310.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 310.5
+      },
+      {
+       "line": "post text not kept on disk ...",
+       "x": 310.5
+      },
+      {
+       "line": "tools off (canary: read/list/r",
+       "x": 310.5
+      }
+     ]
+    },
+    {
+     "box": 5,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 70,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 310.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 310.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 310.5
+      }
+     ]
+    },
+    {
+     "box": 6,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 70,
+     "values": [
+      {
+       "line": "claude 2.1.4 .................",
+       "x": 310.5
+      },
+      {
+       "line": "required flags ...............",
+       "x": 310.5
+      },
+      {
+       "line": "logged in (test classification",
+       "x": 310.5
+      }
+     ]
+    }
+   ],
+   "glyphs": [
+    {
+     "ch": "\u00b7",
+     "code": "U+00B7",
+     "ratio": 1
+    },
+    {
+     "ch": "\u2192",
+     "code": "U+2192",
+     "ratio": 1
+    },
+    {
+     "ch": "\u201c",
+     "code": "U+201C",
+     "ratio": 1
+    },
+    {
+     "ch": "\u201d",
+     "code": "U+201D",
+     "ratio": 1
+    }
+   ],
+   "cell": 7.5015625
+  },
+  "contrastScan": [],
+  "axe": {
+   "violations": [],
+   "incomplete": []
+  }
+ }
+}

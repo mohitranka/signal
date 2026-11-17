@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ClassifyService } from '../src/background/classifyService';
 import { createHandler } from '../src/background/handlers';
 import { CacheStore, FeedbackStore, SettingsStore, StatsStore } from '../src/background/store';
+import { parseRecord } from '../src/classifier/parse';
 import { PROMPT_VERSION } from '../src/classifier/prompt';
 import { chatResponse, cls, fpFor, gem, memoryKV, modelJson, noise, record } from './helpers';
 
@@ -118,5 +119,54 @@ describe('feedback entries keep the classification they corrected', () => {
     const t = setup();
     t.kv.data.feedback = 'corrupted';
     expect(await t.feedback.all()).toEqual({});
+  });
+});
+
+describe('records of copied verdicts carry repeatOf (T3)', () => {
+  const ANCHOR = fpFor('anchor');
+  const copied = (repeatOf: any) => ({ ...record(noise(0.93), 'openai/gpt-4o-mini', PROMPT_VERSION), repeatOf });
+
+  it('parseRecord keeps a valid repeatOf and drops unknown fields inside it', () => {
+    expect(parseRecord(copied({ fp: ANCHOR, similarity: 0.92 }))).toEqual(copied({ fp: ANCHOR, similarity: 0.92 }));
+    expect(parseRecord(copied({ fp: ANCHOR, similarity: 1 }))!.repeatOf).toEqual({ fp: ANCHOR, similarity: 1 });
+    expect(parseRecord(copied({ fp: ANCHOR, similarity: 0.85 }))!.repeatOf).toEqual({ fp: ANCHOR, similarity: 0.85 });
+    expect(parseRecord(copied({ fp: ANCHOR, similarity: 0.9, junk: '<b>' }))!.repeatOf).toEqual({ fp: ANCHOR, similarity: 0.9 });
+  });
+
+  it('parseRecord drops a malformed repeatOf but keeps the record', () => {
+    const plain = record(noise(0.93), 'openai/gpt-4o-mini', PROMPT_VERSION);
+    for (const bad of [
+      { fp: 'not-a-fingerprint', similarity: 0.9 },
+      { fp: ANCHOR.toUpperCase(), similarity: 0.9 },
+      { fp: ANCHOR, similarity: 0.5 },
+      { fp: ANCHOR, similarity: 1.2 },
+      { fp: ANCHOR, similarity: Number.NaN },
+      { fp: ANCHOR, similarity: '0.9' },
+      { fp: ANCHOR },
+      'x',
+      null,
+      [ANCHOR, 0.9],
+    ]) {
+      const r = parseRecord(copied(bad));
+      expect(r, JSON.stringify(bad)).toEqual(plain);
+      expect(r && 'repeatOf' in r).toBe(false);
+    }
+  });
+
+  it('a record without repeatOf is unchanged (older records stay valid)', () => {
+    const plain = record(noise(0.93), 'openai/gpt-4o-mini', PROMPT_VERSION);
+    expect(parseRecord(plain)).toEqual(plain);
+    expect('repeatOf' in parseRecord(plain)!).toBe(false);
+  });
+
+  it('a correction on a copied verdict stores repeatOf; a malformed one is stripped before storing', async () => {
+    const t = setup();
+    await t.handle({ type: 'setFeedback', fp: A, verdict: 'keep', sample: 's', classified: copied({ fp: ANCHOR, similarity: 0.9 }) }, true);
+    expect((await list(t))[A].classified.repeatOf).toEqual({ fp: ANCHOR, similarity: 0.9 });
+    const B = fpFor('b');
+    await t.handle({ type: 'setFeedback', fp: B, verdict: 'keep', sample: 's', classified: copied({ fp: 'zzz', similarity: 0.9 }) }, true);
+    const b = (await list(t))[B];
+    expect(b.classified).toEqual(record(noise(0.93), 'openai/gpt-4o-mini', PROMPT_VERSION));
+    expect(JSON.stringify(t.kv.data)).not.toContain('zzz');
   });
 });

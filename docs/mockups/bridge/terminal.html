@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><title>Signal bridge · terminal mockup</title>
+<style>
+body{margin:0;background:#e9ebee;font:13px/1.5 system-ui;padding:20px;width:max-content}
+h3{margin:16px 0 6px;font-size:13px;color:#333}
+/* an 80-column terminal: 80ch wide content box, so any line over 80 columns would visibly overflow */
+.t{background:#15171a;color:#d7dce2;border-radius:10px;padding:14px 18px;font:12.5px/1.55 'DejaVu Sans Mono',ui-monospace,Menlo,monospace;white-space:pre;width:80ch;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.ok{color:#5cbfa8}.bad{color:#ff8a80}.dim{color:#7d8590}.warn{color:#f2c46d}.b{color:#fff;font-weight:700}
+</style>
+<h3>1 · Start (Claude Code), self-test passes</h3>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude --model sonnet
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+  claude 2.1.4 ....................... <span class="ok">found</span>
+  required flags ..................... <span class="ok">ok</span>
+  logged in (test classification) .... <span class="ok">ok</span>  <span class="dim">3.9 s · subscription</span>
+  tools off (canary: read/list/run) .. <span class="ok">passed</span>
+<span class="ok">Listening</span> on <span class="b">http://127.0.0.1:8791/v1</span>
+  model    <span class="b">claude-code/sonnet</span>
+  limits   1 at a time · queue 8 · timeout 60 s
+In Signal → Model, choose <span class="b">“Local CLI bridge”</span>, then set:
+  Model         <span class="b">claude-code/sonnet</span>
+  Bridge token  <span class="warn">k3Jt0wZq8vN2mR5xL7cT1bY4hF9dS6gA0eW3uK8pQ9x</span>
+  <span class="dim">(shown once; kept in ~/.config/signal-bridge/token, only you can read it)</span>
+<span class="dim">Logs never contain post text. Ctrl-C to stop.</span>
+<span class="dim">12:03:41</span>  classify  <span class="ok">ok</span>    3.8 s   812 in /  74 out   queue 0
+<span class="dim">12:03:46</span>  classify  <span class="ok">ok</span>    4.4 s   977 in /  81 out   queue 1
+<span class="dim">12:03:47</span>  rejected  <span class="warn">401</span>   bad or missing token
+<span class="dim">12:03:52</span>  classify  <span class="ok">ok</span>    5.1 s   903 in /  70 out   queue 0</div>
+
+<h3>2 · Start (Codex), tools could not be switched off: refuses to run</h3>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli codex --model gpt-5
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+  codex 0.58.0 ....................... <span class="ok">found</span>
+  required flags ..................... <span class="ok">ok</span>
+  logged in (test classification) .... <span class="ok">ok</span>  <span class="dim">6.2 s · subscription</span>
+  tools off (canary: read/list/run) .. <span class="bad">FAILED</span>
+    the answer contained the canary file's secret
+<span class="bad">Not starting.</span> codex can still read files while classifying, so a
+malicious post could make it read your files. Signal only runs a CLI
+whose tools are fully off. Codex stays unsupported until it offers a
+tool-free mode.</div>
+
+<h3>3 · Start, flag missing / not logged in</h3>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+  claude 1.0.2 ....................... <span class="ok">found</span>
+  required flags ..................... <span class="bad">missing --tools</span>
+<span class="bad">Not starting.</span> This claude version cannot switch off its tools.
+Update it (<span class="b">claude update</span>) and try again.
+
+<span class="dim">$</span> npm run bridge -- --cli claude
+  logged in (test classification) .... <span class="bad">failed</span>: not logged in
+<span class="bad">Not starting.</span> Run <span class="b">claude</span> once and log in with your subscription,
+then start the bridge again. (ANTHROPIC_API_KEY is ignored on purpose:
+the bridge never bills the API.)</div>

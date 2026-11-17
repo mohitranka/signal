@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Signal popup · local CLI bridge mockup</title>
+  <link rel="stylesheet" href="../../../public/popup.css">
+  <style>
+    /* ---- PROPOSED additions to popup.css (new in this feature) ---- */
+    .preset-help { font-size: 12px; color: var(--muted); margin-top: -4px; }
+    .preset-help code { font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; color: var(--text); }
+    .tile.sub b { font-size: 13px; letter-spacing: 0; padding-top: 2px; }
+    /* mockup only */
+    .marker { outline: 2px dashed #e0a800; outline-offset: 3px; border-radius: 8px; }
+    .mock-tip { position: relative; }
+    .mock-tip::after { content: attr(data-tip); position: absolute; right: 0; top: calc(100% + 4px); white-space: normal; width: 210px; text-align: left; font-size: 11.5px; background: #1c1f23; color: #fff; padding: 5px 8px; border-radius: 6px; z-index: 3; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+    .caption { font: 600 12px system-ui; color: var(--muted); margin: 14px 16px 0; text-transform: uppercase; letter-spacing: .04em; }
+  </style>
+</head>
+<body>
+  <p class="caption">A · Connected through the bridge</p>
+  <header class="app-header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7"/><path d="M6 15.5h2.2M10.9 12h2.2M15.8 8.5H18" /><path d="M7.1 15.5V18M12 12v6M16.9 8.5V18" /></svg>
+      <div><h1>Signal</h1><p class="status">Reviewing · Balanced</p></div>
+    </div>
+    <label class="switch"><input type="checkbox" checked role="switch" aria-label="Enabled"><span class="track"></span></label>
+  </header>
+  <main>
+    <details class="card" open>
+      <summary><span class="title">Model</span><span class="chip marker">claude-code · sonnet</span></summary>
+      <div class="body">
+        <label class="input marker">Provider
+          <select aria-describedby="presetHelp"><option selected>Local CLI bridge (Claude Code / Codex)</option><option>OpenRouter</option><option>OpenAI</option><option>Ollama (local)</option><option>Custom</option></select>
+        </label>
+        <p class="preset-help marker" id="presetHelp">Uses your logged-in Claude Code or Codex subscription through a small server on this computer. Start it with <code>npm run bridge -- --cli claude</code>, then paste the model and token it prints.</p>
+        <label class="input">Endpoint<input type="url" value="http://127.0.0.1:8791/v1"></label>
+        <label class="input">Model<input type="text" value="claude-code/sonnet"></label>
+        <label class="input marker">Bridge token<input type="password" placeholder="Saved · leave blank to keep"></label>
+        <details class="advanced" open>
+          <summary>Advanced</summary>
+          <div class="grid2">
+            <label class="input">Concurrency<input type="number" value="1"></label>
+            <label class="input">Timeout (s)<input type="number" value="90"></label>
+            <label class="input">$ / 1M input<input type="number" placeholder="not used" disabled></label>
+            <label class="input">$ / 1M output<input type="number" placeholder="not used" disabled></label>
+          </div>
+        </details>
+        <div class="actions"><button type="button" class="btn primary">Save</button><button type="button" class="btn">Test connection</button></div>
+        <p id="llmStatus" class="marker">Connected · replied in 4,210 ms (test post rated: keep) · via Claude Code subscription</p>
+      </div>
+    </details>
+    <section class="card" aria-label="This session">
+      <div class="card-head"><h2>This session</h2><button type="button" class="link">Clear cache</button></div>
+      <div class="tiles">
+        <div class="tile"><b>41</b><span>classified</span></div>
+        <div class="tile"><b>12</b><span>cache hits</span></div>
+        <div class="tile"><b>9</b><span>repeats</span></div>
+        <div class="tile"><b>38k</b><span>tokens</span></div>
+        <div class="tile sub marker mock-tip" data-tip="Billed to your subscription via the local bridge · no per-token cost"><b>Plan</b><span>est. cost</span></div>
+      </div>
+      <p class="meta" id="stats" style="margin-top:46px">This tab: 4 collapsed, 1 highlighted</p>
+    </section>
+  </main>
+
+  <p class="caption">B · Errors the bridge can report (through Test connection)</p>
+  <main>
+    <section class="card"><div class="body" style="padding-top:12px">
+      <p id="llmStatus" class="err">network: Could not reach the bridge at 127.0.0.1:8791. Is it running? <code>npm run bridge -- --cli claude</code></p>
+      <p id="llmStatus" class="err">auth: Authentication failed (401). Paste the token printed by the bridge into “Bridge token”.</p>
+      <p id="llmStatus" class="err">config: Request rejected (400). This bridge serves claude-code/sonnet; set Model to that.</p>
+      <p id="llmStatus" class="err">rate_limit: The bridge is busy (one post at a time); Signal retries automatically.</p>
+    </div></section>
+  </main>
+</body>
+</html>

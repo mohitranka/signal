@@ -59,6 +59,8 @@ interface CacheEntry {
 /** Persistent classification cache, LRU-ish by last access, size-capped. Holds model output only, never post text. */
 export class CacheStore {
   private map: Map<string, CacheEntry> | null = null;
+  /** The one storage read in flight, shared by concurrent first uses (docs/design-finding-e-lazy-load.md). */
+  private loading: Promise<Map<string, CacheEntry>> | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -67,12 +69,20 @@ export class CacheStore {
     private persistDelayMs = 2000,
   ) {}
 
-  private async load(): Promise<Map<string, CacheEntry>> {
-    if (!this.map) {
-      const { cache } = await this.kv.get('cache');
-      this.map = new Map(Object.entries((cache as Record<string, CacheEntry>) ?? {}));
-    }
-    return this.map;
+  /**
+   * The in-memory cache, read from storage on first use. Concurrent first uses share one read, so no copy replaces
+   * another (which would drop what was written to it); a clear() during the read wins; a failed read is retried next time.
+   */
+  private load(): Promise<Map<string, CacheEntry>> {
+    if (this.map) return Promise.resolve(this.map);
+    this.loading ??= this.kv
+      .get('cache')
+      .then(({ cache }) => {
+        this.map ??= new Map(Object.entries((cache as Record<string, CacheEntry>) ?? {}));
+        return this.map;
+      })
+      .finally(() => (this.loading = null));
+    return this.loading;
   }
 
   async get(key: string): Promise<Classification | null> {
@@ -81,6 +91,11 @@ export class CacheStore {
     if (!e) return null;
     e.t = Date.now();
     return e.c;
+  }
+
+  /** The verdict without marking it used (a look that is not a use: the repeat lookup's candidates). */
+  async peek(key: string): Promise<Classification | null> {
+    return (await this.load()).get(key)?.c ?? null;
   }
 
   async set(key: string, c: Classification): Promise<void> {
@@ -399,6 +414,7 @@ export const emptyStats = (): Stats => ({
   httpRequests: 0,
   classified: 0,
   cacheHits: 0,
+  repeatHits: 0,
   failures: 0,
   promptTokens: 0,
   completionTokens: 0,
@@ -408,14 +424,20 @@ export const emptyStats = (): Stats => ({
 /** Session statistics, kept in storage.session so they survive service-worker restarts but not browser restarts. */
 export class StatsStore {
   private stats: Stats | null = null;
+  /** The one storage read in flight, shared by concurrent first uses (updates made meanwhile are not lost). */
+  private loading: Promise<Stats> | null = null;
   constructor(private kv: KV) {}
 
-  async get(): Promise<Stats> {
-    if (!this.stats) {
-      const { stats } = await this.kv.get('stats');
-      this.stats = { ...emptyStats(), ...((stats as Partial<Stats>) ?? {}) };
-    }
-    return this.stats;
+  get(): Promise<Stats> {
+    if (this.stats) return Promise.resolve(this.stats);
+    this.loading ??= this.kv
+      .get('stats')
+      .then(({ stats }) => {
+        this.stats ??= { ...emptyStats(), ...((stats as Partial<Stats>) ?? {}) };
+        return this.stats;
+      })
+      .finally(() => (this.loading = null));
+    return this.loading;
   }
 
   async bump(delta: Partial<Stats>): Promise<void> {

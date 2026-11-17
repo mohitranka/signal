@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Signal bridge · security B5 · terminal mockup</title>
+<style>
+body{margin:0;background:#e9ebee;font:13px/1.5 system-ui;padding:20px;width:max-content}
+h3{margin:16px 0 6px;font-size:13px;color:#333}
+/* an 80-column terminal: 80ch wide content box, so any line over 80 columns would visibly overflow */
+.t{background:#15171a;color:#d7dce2;border-radius:10px;padding:14px 18px;font:12.5px/1.55 'DejaVu Sans Mono',ui-monospace,Menlo,monospace;white-space:pre;width:80ch;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.ok{color:#5cbfa8}.bad{color:#ff8a80}.dim{color:#7d8590}.warn{color:#f2c46d}.b{color:#fff;font-weight:700}
+.new{position:relative}.new::before{content:"";position:absolute;left:-12px;top:.1em;bottom:.1em;width:3px;border-radius:2px;background:#f2c46d}
+@media (forced-colors: active){.new::before{background:CanvasText}}
+</style>
+<main><h1 style="font-size:15px;margin:0 0 4px">Signal bridge · security B5 · terminal output</h1>
+<p style="margin:0 0 6px;color:#444">Marked with a yellow bar on the left: new or changed lines (mockup only). Versions, paths and times are illustrative.</p>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">1 · Running: a call cannot be prepared (disk full); Signal gets 502, the bridge keeps serving</h2>
+<div class="t"><span class="dim">12:39:58</span>  classify  <span class="ok">ok</span>     3.8 s    812 in /   74 out  queue 0
+<span class="new"><span class="dim">12:40:05</span>  classify  <span class="bad">502</span>    0.0 s  not prepared (ENOSPC)  queue 0</span>
+<span class="dim">12:41:30</span>  classify  <span class="ok">ok</span>     4.1 s    790 in /   71 out  queue 0</div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">2 · Running: the re-check after a CLI update cannot run; the bridge stops serving, with the reason</h2>
+<div class="t"><span class="dim">12:40:02</span>  <span class="warn">claude changed (update?) · pausing, re-checking</span>
+<span class="new"><span class="dim">12:40:02</span>  <span class="bad">re-check failed · not serving any more</span></span>
+<span class="new">  could not prepare a temporary folder (ENOSPC)</span>
+<span class="bad">Stopped serving.</span> The new claude did not pass the checks above.
+Requests get 503. Fix the cause, then restart the bridge (Ctrl-C).</div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">3 · Start: no usable temporary folder; a sentence instead of a stack trace</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> Could not prepare a temporary folder (ENOSPC).</span></div>
+</main>

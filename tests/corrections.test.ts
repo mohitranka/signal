@@ -12,7 +12,7 @@ import {
   type CorrectionInput,
 } from '../src/corrections';
 import type { FeedbackEntry } from '../src/shared/types';
-import { cls, gem, noise, record } from './helpers';
+import { cls, fpFor, gem, noise, record } from './helpers';
 
 vi.mock('../src/scoring', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/scoring')>();
@@ -203,5 +203,66 @@ describe('input adapters', () => {
       { id: 'r1', label: 'keep', record: { classification: noise(), model: 'm', promptVersion: V } },
       { id: 'r2', label: 'collapse' },
     ]);
+  });
+});
+
+describe('corrections on copied verdicts are counted separately (T10)', () => {
+  const ANCHOR = fpFor('anchor');
+  const copiedRec = (c: ReturnType<typeof cls>) => ({ ...record(c, 'm', V), repeatOf: { fp: ANCHOR, similarity: 0.9 } });
+  // x: worth keeping, copied collapse at 0.97 -> wrongly hidden at every sensitivity
+  // y: low quality, copied keep                -> missed at every sensitivity
+  const withCopied: CorrectionInput[] = [
+    ...items,
+    { id: 'x', label: 'keep', record: copiedRec(noise(0.97)) },
+    { id: 'y', label: 'collapse', record: copiedRec(cls()) },
+  ];
+
+  it('partitionCorrections marks predictions whose classification was copied', () => {
+    const { included } = partitionCorrections(withCopied, target);
+    const byId = Object.fromEntries(included.map((p) => [p.row.id, p]));
+    expect(byId.x!.copied).toBe(true);
+    expect(byId.y!.copied).toBe(true);
+    expect(byId.a!.copied ?? false).toBe(false);
+  });
+
+  it('the report counts copied corrections per sensitivity; the totals still include them', () => {
+    const r = correctionReport(partitionCorrections(withCopied, target).included);
+    expect(r.copiedTotal).toBe(2);
+    expect(r.rows).toEqual([
+      { sensitivity: 'relaxed', wronglyHidden: 2, missed: 3, copiedWronglyHidden: 1, copiedMissed: 1 },
+      { sensitivity: 'balanced', wronglyHidden: 3, missed: 3, copiedWronglyHidden: 1, copiedMissed: 1 },
+      { sensitivity: 'strict', wronglyHidden: 3, missed: 2, copiedWronglyHidden: 1, copiedMissed: 1 },
+    ]);
+    expect(r.keptTotal).toBe(4);
+    expect(r.lowQualityTotal).toBe(4);
+  });
+
+  it('without copied corrections: copiedTotal is 0 and the rows keep their previous shape', () => {
+    const r = correctionReport(partitionCorrections(items, target).included);
+    expect(r.copiedTotal).toBe(0);
+    for (const row of r.rows) expect(Object.keys(row).sort()).toEqual(['missed', 'sensitivity', 'wronglyHidden']);
+  });
+
+  it('feedbackToInputs keeps repeatOf; a malformed one counts as not copied', () => {
+    const all: Record<string, FeedbackEntry> = {
+      x: { verdict: 'keep', at: 1, sample: 's', classified: copiedRec(noise(0.97)) },
+      z: { verdict: 'keep', at: 1, sample: 's', classified: { ...record(noise(0.97), 'm', V), repeatOf: { fp: 'bad', similarity: 0.9 } } as any },
+    };
+    const { included } = partitionCorrections(feedbackToInputs(all), target);
+    const byId = Object.fromEntries(included.map((p) => [p.row.id, p]));
+    expect(byId.x!.copied).toBe(true);
+    expect(byId.z!.copied ?? false).toBe(false);
+  });
+
+  it('rowsToInputs reads repeat_of / repeat_similarity from exported rows', () => {
+    const rows = [
+      { id: 'r1', source: 'user-feedback', label: 'keep', text: 't', classification: noise(0.97), model: 'm', prompt_version: V, repeat_of: ANCHOR, repeat_similarity: 0.9 },
+      { id: 'r2', source: 'user-feedback', label: 'keep', text: 't', classification: noise(0.97), model: 'm', prompt_version: V },
+    ] as any;
+    const inputs = rowsToInputs(rows);
+    expect((inputs[0]!.record as any).repeatOf).toEqual({ fp: ANCHOR, similarity: 0.9 });
+    expect('repeatOf' in (inputs[1]!.record as any)).toBe(false);
+    const { included } = partitionCorrections(inputs, target);
+    expect(included.map((p) => p.copied ?? false)).toEqual([true, false]);
   });
 });

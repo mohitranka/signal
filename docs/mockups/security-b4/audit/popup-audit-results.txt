@@ -1,0 +1,28 @@
+== today-light
+  axe violations: none
+  tab stops without a visible focus indicator: none (of 29 stops)
+  Provider select, accessible description: 'Uses your logged-in Claude Code or Codex subscription through a small server on this computer. Start it with npm run bridge -- --cli claude, then paste the model and token it prints.'
+  status line (role=status): ''
+  cost tile: accessible text 'Plan' · keyboard-focusable: False
+== after-light
+  axe violations: none
+  tab stops without a visible focus indicator: none (of 29 stops)
+  Provider select, accessible description: 'Uses the Claude Code or Codex CLI you are logged in to, through a small server on this computer. Start it with npm run bridge -- --cli claude, then paste the model and token it prints.'
+  status line (role=status): ''
+  cost tile: accessible text 'Plan' · keyboard-focusable: False
+  forced colours: {'code': 'rgb(0, 0, 0)', 'help': 'rgb(0, 0, 0)', 'status': 'rgb(0, 0, 0)', 'bg': 'rgb(255, 255, 255)'}
+  zoom 200 %: {'overflow': 0, 'cut': []}
+== today-dark
+  axe violations: none
+  tab stops without a visible focus indicator: none (of 29 stops)
+  Provider select, accessible description: 'Uses your logged-in Claude Code or Codex subscription through a small server on this computer. Start it with npm run bridge -- --cli claude, then paste the model and token it prints.'
+  status line (role=status): ''
+  cost tile: accessible text 'Plan' · keyboard-focusable: False
+== after-dark
+  axe violations: none
+  tab stops without a visible focus indicator: none (of 29 stops)
+  Provider select, accessible description: 'Uses the Claude Code or Codex CLI you are logged in to, through a small server on this computer. Start it with npm run bridge -- --cli claude, then paste the model and token it prints.'
+  status line (role=status): ''
+  cost tile: accessible text 'Plan' · keyboard-focusable: False
+  forced colours: {'code': 'rgb(255, 255, 255)', 'help': 'rgb(255, 255, 255)', 'status': 'rgb(255, 255, 255)', 'bg': 'rgb(0, 0, 0)'}
+  zoom 200 %: {'overflow': 0, 'cut': []}

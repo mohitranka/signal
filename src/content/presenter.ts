@@ -16,6 +16,11 @@ export interface View {
    * expanded it to read and it was never hidden ("Signal would collapse this · Hide"). Defaults to 'revealed'.
    */
   visibleBecause?: 'revealed' | 'expanded';
+  /**
+   * The model verdict was copied from a similar post (docs/design-repeats.md). `judging`: the user asked for this
+   * post's own verdict and it has not arrived yet.
+   */
+  repeat?: { similarity: number; judging: boolean };
 }
 
 export interface Actions {
@@ -24,6 +29,8 @@ export interface Actions {
   keep(): void;
   lowQuality(): void;
   undo(): void;
+  /** Ask the model about this post itself instead of using the verdict copied from a similar post. */
+  judgeSeparately(): void;
 }
 
 const CSS = `
@@ -48,8 +55,19 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .review.highlight { --dot: var(--accent); }
 .review.collapse { --dot: var(--danger); }
 .bar.quiet { justify-content: flex-end; padding: 0 4px 4px; }
-.bar.quiet button { opacity: .55; font-weight: 500; font-size: 11.5px; padding: 2px 10px; color: var(--fg); transition: opacity .12s; }
-.bar.quiet button:hover, .bar.quiet button:focus-visible { opacity: 1; color: var(--strong); }
+/* Quiet through size, weight and no border or fill at rest; never through opacity (finding G: text stays >= 4.5:1). */
+.bar.quiet button { font-weight: 500; font-size: 11.5px; padding: 2px 10px; color: var(--fg); background: transparent; border-color: transparent; transition: color .12s, background-color .12s, border-color .12s; }
+.bar.quiet button:hover, .bar.quiet button:focus-visible { color: var(--strong); background: var(--surface); border-color: var(--neutral); }
+.bar.has-note { flex-wrap: wrap; row-gap: 2px; }
+.bar.has-note .reason { flex: 1 1 0; }
+.bar .note { flex: 1 0 100%; order: 10; font-size: 11.5px; color: var(--fg); padding-left: 15px; }
+.bar .note::before { content: "≈"; font-weight: 700; margin-right: 5px; margin-left: -12px; }
+.bar .note .link { all: unset; cursor: pointer; font-weight: 600; color: var(--strong); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 2px; }
+.bar .note .link:hover { text-decoration-color: currentColor; }
+.bar .note .link:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-radius: 2px; }
+.bar .note .busy { font-weight: 600; }
+.bar.quiet.has-note { flex-wrap: nowrap; }
+.bar.quiet .note { flex: 1 1 auto; order: 0; padding-left: 12px; font-size: 11px; }
 @media (prefers-color-scheme: dark) {
   .bar { --fg: #a9b0b8; --strong: #e7e9ec; --surface: #1e2226; --border: #363b41; --hover: #2a2f34; --accent: #5cbfa8; --danger: #ff8a80; --neutral: #6f7680; --focus: #70b5f9; }
 }
@@ -63,10 +81,14 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 function keptSummary(view: View): string {
   const pct = view.confidence !== undefined ? `${Math.round(view.confidence * 100)}%` : '';
   const reason = view.reason ? `: ${view.reason}` : '';
-  if (view.modelDecision === 'collapse') return `Kept, although the model rated it low quality${pct ? ` (${pct})` : ''}${reason}`;
-  if (view.modelDecision === 'highlight') return `Kept, although the model rated it a standout${pct ? ` (${pct})` : ''}${reason}`;
-  return `Kept${pct ? ` (model ${pct} confident)` : ''}${reason}`;
+  const copied = view.repeat ? ` · ${REPEAT_NOTE} (${similarPct(view.repeat.similarity)} similar)` : '';
+  if (view.modelDecision === 'collapse') return `Kept, although the model rated it low quality${pct ? ` (${pct})` : ''}${reason}${copied}`;
+  if (view.modelDecision === 'highlight') return `Kept, although the model rated it a standout${pct ? ` (${pct})` : ''}${reason}${copied}`;
+  return `Kept${pct ? ` (model ${pct} confident)` : ''}${reason}${copied}`;
 }
+
+const REPEAT_NOTE = 'Same template as a post judged earlier';
+const similarPct = (s: number) => `${Math.round(s * 100)}%`;
 
 /** Is this view rendered as a hidden (collapsed) post? Shared with the controller's tab statistics. */
 export const isCollapsedView = (view: View): boolean =>
@@ -201,6 +223,27 @@ export class Presenter {
 
     const bar = el('div', 'bar');
     const reason = (t: string) => bar.appendChild(el('span', 'reason', t));
+    /**
+     * A model verdict copied from a similar post: a second row (outside the 2-line-clamped reason) saying so, with
+     * "Judge separately" (or "Judging…" while that is under way). Never on a post you marked: your mark decides.
+     */
+    const repeat = view.source === 'model' ? view.repeat : undefined;
+    const note = () => {
+      if (!repeat) return;
+      const pct = similarPct(repeat.similarity);
+      const n = el('span', 'note', `${REPEAT_NOTE} · `);
+      n.title = `Verdict copied from a post that is ${pct} similar. No model call was made for this post.`;
+      if (repeat.judging) {
+        n.appendChild(el('span', 'busy', 'Judging…'));
+      } else {
+        const b = btn('Judge separately', a.judgeSeparately);
+        b.className = 'link';
+        b.setAttribute('aria-label', `Judge separately. Verdict copied from a post that is ${pct} similar.`);
+        n.appendChild(b);
+      }
+      bar.classList.add('has-note');
+      bar.appendChild(n);
+    };
 
     if (collapsed) {
       bar.classList.add('collapsed');
@@ -212,6 +255,7 @@ export class Presenter {
       } else {
         bar.appendChild(btn('Undo', a.undo));
       }
+      note();
       return bar;
     }
 
@@ -228,6 +272,7 @@ export class Presenter {
       reason(view.reason);
       bar.appendChild(btn(expanded ? 'Hide' : 'Hide again', a.hide));
       bar.appendChild(btn('Worth keeping', a.keep));
+      note();
       return bar;
     }
 
@@ -235,6 +280,7 @@ export class Presenter {
     // The verdict and reason stay available on hover and to screen readers.
     if (view.outcome === 'keep') {
       bar.classList.add('quiet');
+      note(); // on the left of the quiet row
       const summary = keptSummary(view);
       const b = btn('Low quality', a.lowQuality);
       b.title = summary; // attribute text, never parsed as HTML
@@ -251,6 +297,7 @@ export class Presenter {
     reason(view.reason);
     if (view.outcome === 'highlight') bar.appendChild(btn('Low quality', a.lowQuality));
     else bar.appendChild(btn('Worth keeping', a.keep));
+    note();
     return bar;
   }
 }

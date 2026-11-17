@@ -117,3 +117,73 @@ export const record = (classification: Classification, model = 'm', promptVersio
 
 /** A realistic content fingerprint (32 lowercase hex chars) for a short test label. */
 export const fpFor = (label: string) => createHash('md5').update(label).digest('hex');
+
+/**
+ * Wait for the code, not for a number of ticks (see tests/setup.ts: slow-machine mode). Fails loudly instead of hanging.
+ */
+export async function until(cond: () => boolean, what: string, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!cond()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for: ${what}`);
+    await new Promise((r) => setTimeout(r, 2));
+  }
+}
+
+/**
+ * memoryKV whose reads (hold) or writes (holdWrite) of chosen keys wait until released, reporting which held
+ * operations are currently blocked. Parks a request or a save at an exact storage step, deterministically.
+ */
+export function gatedKV() {
+  const kv = memoryKV();
+  const reads = new Map<string, Promise<void>>();
+  /** Held reads that capture the stored value when called (not when released): a read "in flight" across a write. */
+  const snapshotReads = new Set<string>();
+  const writes = new Map<string, Promise<void>>();
+  const blocked = new Map<string, number>();
+  const park = async (id: string, gate: Promise<void>) => {
+    blocked.set(id, (blocked.get(id) ?? 0) + 1);
+    await gate;
+    blocked.set(id, blocked.get(id)! - 1);
+  };
+  const get = kv.get;
+  kv.get = async (k: string) => {
+    const gate = reads.get(k);
+    if (gate && snapshotReads.has(k)) {
+      const value = get(k); // read now...
+      await park(`read:${k}`, gate);
+      return value; // ...deliver later
+    }
+    if (gate) await park(`read:${k}`, gate);
+    return get(k);
+  };
+  const set = kv.set;
+  kv.set = async (items: Record<string, unknown>) => {
+    const gate = Object.keys(items).map((k) => writes.get(k)).find(Boolean);
+    if (gate) await park(`write:${Object.keys(items).find((k) => writes.has(k))}`, gate);
+    return set(items);
+  };
+  const gateOn = (map: Map<string, Promise<void>>, k: string) => {
+    let release!: () => void;
+    map.set(k, new Promise<void>((r) => (release = r)));
+    return () => {
+      map.delete(k);
+      release();
+    };
+  };
+  return {
+    kv,
+    /**
+     * Hold reads of `k` until the returned release() is called. With { snapshot: true } a held read returns the value
+     * stored when it was called, as a real read already in flight would, even if `k` is written meanwhile.
+     */
+    hold: (k: string, opts: { snapshot?: boolean } = {}) => {
+      if (opts.snapshot) snapshotReads.add(k);
+      else snapshotReads.delete(k);
+      return gateOn(reads, k);
+    },
+    /** Hold writes that include `k` until the returned release() is called. */
+    holdWrite: (k: string) => gateOn(writes, k),
+    isBlocked: (k: string) => (blocked.get(`read:${k}`) ?? 0) > 0,
+    isWriteBlocked: (k: string) => (blocked.get(`write:${k}`) ?? 0) > 0,
+  };
+}

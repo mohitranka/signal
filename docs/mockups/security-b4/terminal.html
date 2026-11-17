@@ -1,0 +1,107 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Signal bridge · security B4 · terminal mockup</title>
+<style>
+body{margin:0;background:#e9ebee;font:13px/1.5 system-ui;padding:20px;width:max-content}
+h3{margin:16px 0 6px;font-size:13px;color:#333}
+/* an 80-column terminal: 80ch wide content box, so any line over 80 columns would visibly overflow */
+.pair{display:flex;gap:18px;align-items:flex-start}.col h3{font-size:12px;margin:0 0 4px;color:#333}.t{background:#15171a;color:#d7dce2;border-radius:10px;padding:14px 18px;font:12.5px/1.55 'DejaVu Sans Mono',ui-monospace,Menlo,monospace;white-space:pre;width:80ch;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.ok{color:#5cbfa8}.bad{color:#ff8a80}.dim{color:#7d8590}.warn{color:#f2c46d}.b{color:#fff;font-weight:700}
+.new{position:relative}.new::before{content:"";position:absolute;left:-12px;top:.1em;bottom:.1em;width:3px;border-radius:2px;background:#f2c46d}
+@media (forced-colors: active){.new::before{background:CanvasText}}
+</style>
+<main><h1 style="font-size:15px;margin:0 0 4px">Signal bridge · security B4 · today (recorded) and after (mockup)</h1>
+<p style="margin:0 0 6px;color:#444">Left: the real output of today's bridge, recorded by running it (home folder shown as ~, nothing else changed). Right: the mockup. Yellow bar: new or changed lines (mockup only). Versions, paths and times are illustrative.</p>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">1 · Start (Claude Code): the test line, and the billing notice before “Listening”</h2>
+<div class="pair"><div class="col"><h3>Today (recorded)</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+Signal bridge · local CLI bridge · classification only
+  claude 2.1.4 ....................... found
+    ~/.local/bin/claude
+    runs with /usr/bin/node
+  required flags ..................... ok
+  logged in (test classification) .... ok  0.1 s · subscription
+  post text not kept on disk ......... ok
+  tools off (canary: read/list/run) .. passed
+Listening on http://127.0.0.1:8791/v1
+  model    claude-code/sonnet
+  limits   1 at a time · queue 8 · timeout 60 s
+In Signal → Model, choose “Local CLI bridge”, then set:
+  Model         claude-code/sonnet
+  Bridge token  YWX4s59LgSoNjVPxpXgqjxY0qxm37iu4ThUv3-zomUc
+  (shown once; kept in ~/.config/signal-bridge/token, only you can read it)
+Logs never contain post text. Ctrl-C to stop.</div></div><div class="col"><h3>After (mockup)</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+Signal bridge · local CLI bridge · classification only
+  claude 2.1.4 ....................... found
+    ~/.local/bin/claude
+    runs with /usr/bin/node
+  required flags ..................... ok
+<span class="new">  logged in (test classification) .... ok  0.1 s</span>
+  post text not kept on disk ......... ok
+  tools off (canary: read/list/run) .. passed
+<span class="new">Billing: the bridge passes no API key. If claude is set up with one (an</span>
+<span class="new">apiKeyHelper or API key in ~/.claude/settings.json), that account is</span>
+<span class="new">billed, not your subscription.</span>
+Listening on http://127.0.0.1:8791/v1
+  model    claude-code/sonnet
+  limits   1 at a time · queue 8 · timeout 60 s
+In Signal → Model, choose “Local CLI bridge”, then set:
+  Model         claude-code/sonnet
+  Bridge token  YWX4s59LgSoNjVPxpXgqjxY0qxm37iu4ThUv3-zomUc
+  (shown once; kept in ~/.config/signal-bridge/token, only you can read it)
+Logs never contain post text. Ctrl-C to stop.</div></div></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">2 · Start (Codex): its billing notice</h2>
+<div class="pair"><div class="col"><h3>Today (recorded)</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli codex --model gpt-5
+Signal bridge · local CLI bridge · classification only
+  codex 0.58.0 ....................... found
+    ~/.local/bin/codex
+    runs with /usr/bin/node
+  required flags ..................... ok
+  logged in (test classification) .... ok  0.1 s · subscription
+  post text not kept on disk ......... ok
+  tools off (canary: read/list/run) .. passed
+Listening on http://127.0.0.1:8791/v1
+  model    codex/gpt-5
+  limits   1 at a time · queue 8 · timeout 60 s
+In Signal → Model, choose “Local CLI bridge”, then set:
+  Model         codex/gpt-5
+  Bridge token  QcT-hxUay7cqeom-qIjioGJJsLrulj7QVDL7llX5AGo
+  (shown once; kept in ~/.config/signal-bridge/token, only you can read it)
+Logs never contain post text. Ctrl-C to stop.</div></div><div class="col"><h3>After (mockup)</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli codex --model gpt-5
+Signal bridge · local CLI bridge · classification only
+  codex 0.58.0 ....................... found
+    ~/.local/bin/codex
+    runs with /usr/bin/node
+  required flags ..................... ok
+<span class="new">  logged in (test classification) .... ok  0.1 s</span>
+  post text not kept on disk ......... ok
+  tools off (canary: read/list/run) .. passed
+<span class="new">Billing: the bridge passes no API key. If codex is logged in with an API</span>
+<span class="new">key rather than your ChatGPT account, that account is billed, not your</span>
+<span class="new">subscription.</span>
+Listening on http://127.0.0.1:8791/v1
+  model    codex/gpt-5
+  limits   1 at a time · queue 8 · timeout 60 s
+In Signal → Model, choose “Local CLI bridge”, then set:
+  Model         codex/gpt-5
+  Bridge token  QcT-hxUay7cqeom-qIjioGJJsLrulj7QVDL7llX5AGo
+  (shown once; kept in ~/.config/signal-bridge/token, only you can read it)
+Logs never contain post text. Ctrl-C to stop.</div></div></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">3 · Not logged in: the last sentence</h2>
+<div class="pair"><div class="col"><h3>Today (recorded)</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+Signal bridge · local CLI bridge · classification only
+  claude 2.1.4 ....................... found
+    ~/.local/bin/claude
+    runs with /usr/bin/node
+  required flags ..................... ok
+  logged in (test classification) .... failed: not logged in
+Not starting. Run claude once and log in with your subscription,
+then start the bridge again. (ANTHROPIC_API_KEY is ignored on purpose:
+the bridge never bills the API.)</div></div><div class="col"><h3>After (mockup)</h3><div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+Signal bridge · local CLI bridge · classification only
+  claude 2.1.4 ....................... found
+    ~/.local/bin/claude
+    runs with /usr/bin/node
+  required flags ..................... ok
+  logged in (test classification) .... failed: not logged in
+Not starting. Run claude once and log in with your subscription,
+then start the bridge again. (ANTHROPIC_API_KEY is ignored on purpose:
+<span class="new">the bridge never passes an API key.)</span></div></div></div>
+</main>

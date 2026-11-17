@@ -21,11 +21,22 @@ export interface Classification {
   signals: Signals;
 }
 
+/**
+ * A verdict copied from a similar post instead of asking the model (docs/design-repeats.md): the content fingerprint of
+ * the post the model judged, and the estimated similarity (0.85–1, two decimals).
+ */
+export interface RepeatOf {
+  fp: string;
+  similarity: number;
+}
+
 /** A classification together with what produced it. Feedback keeps one so corrections can be re-scored offline. */
 export interface ClassificationRecord {
   classification: Classification;
   model: string;
   promptVersion: string;
+  /** Present when the classification was copied from a similar post rather than produced for this post. */
+  repeatOf?: RepeatOf;
 }
 
 /** Everything about a post that is ever sent to the model. Untrusted third-party text. */
@@ -54,6 +65,8 @@ export interface Settings {
   /** Optional USD per 1M tokens, used only for the cost estimate in the popup. */
   inputPricePerM: number | null;
   outputPricePerM: number | null;
+  /** Recognise repeated templates: reuse a verdict for a long post that closely matches one the model judged. */
+  repeats: boolean;
 }
 
 /** Settings as exposed to content scripts and the popup: the API key never leaves the background. */
@@ -72,7 +85,7 @@ export type ErrorKind =
   | 'invalid';
 
 export type ClassifyResult =
-  | { ok: true; classification: Classification; cached: boolean; model: string; promptVersion: string }
+  | { ok: true; classification: Classification; cached: boolean; model: string; promptVersion: string; repeatOf?: RepeatOf }
   | { ok: false; kind: ErrorKind; message: string };
 
 export type Verdict = 'keep' | 'collapse';
@@ -92,6 +105,8 @@ export interface Stats {
   httpRequests: number;
   classified: number;
   cacheHits: number;
+  /** Verdicts copied from a similar post (no model call). Counted separately from exact cache hits. */
+  repeatHits: number;
   failures: number;
   promptTokens: number;
   completionTokens: number;
@@ -108,7 +123,8 @@ export interface PageStats {
 
 /** content script -> background */
 export type ContentMessage =
-  | { type: 'classify'; fp: string; input: PostInput }
+  /** noRepeat: judge this post on its own ("Judge separately", or re-judging a post that has its own verdict). */
+  | { type: 'classify'; fp: string; input: PostInput; noRepeat?: boolean }
   | { type: 'cancelAll' }
   /** The post's text grew: this fingerprint's request is no longer needed by this caller. */
   | { type: 'cancel'; fp: string }

@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Signal bridge · security B6 · terminal mockup</title>
+<style>
+body{margin:0;background:#e9ebee;font:13px/1.5 system-ui;padding:20px;width:max-content}
+h3{margin:16px 0 6px;font-size:13px;color:#333}
+/* an 80-column terminal: 80ch wide content box, so any line over 80 columns would visibly overflow */
+.t{background:#15171a;color:#d7dce2;border-radius:10px;padding:14px 18px;font:12.5px/1.55 'DejaVu Sans Mono',ui-monospace,Menlo,monospace;white-space:pre;width:80ch;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.ok{color:#5cbfa8}.bad{color:#ff8a80}.dim{color:#7d8590}.warn{color:#f2c46d}.b{color:#fff;font-weight:700}
+.new{position:relative}.new::before{content:"";position:absolute;left:-12px;top:.1em;bottom:.1em;width:3px;border-radius:2px;background:#f2c46d}
+@media (forced-colors: active){.new::before{background:CanvasText}}
+</style>
+<main><h1 style="font-size:15px;margin:0 0 4px">Signal bridge · security B6 · terminal output</h1>
+<p style="margin:0 0 6px;color:#444">Marked with a yellow bar on the left: new or changed lines (mockup only). Versions, paths and times are illustrative.</p>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">1 · The token folder is writable by other users (new check)</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> The bridge token folder is writable by other users:</span>
+<span class="new">  ~/.config/signal-bridge</span>
+<span class="new">Fix it with:</span>
+<span class="new">  chmod 700 ~/.config/signal-bridge</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">2 · A folder above it is writable by other users (new check)</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> A folder above the bridge token is writable by other users:</span>
+<span class="new">  ~/.config</span>
+<span class="new">Fix it with:</span>
+<span class="new">  chmod go-w ~/.config</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">3 · The token file is owned by another user (new check)</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> The bridge token file is owned by another user:</span>
+<span class="new">  ~/.config/signal-bridge/token</span>
+<span class="new">Remove it, then start again (a new token is created):</span>
+<span class="new">  rm ~/.config/signal-bridge/token</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">4 · The token file can be read by other users (existing check; was one 182-column line)</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> The bridge token file can be read by other users:</span>
+<span class="new">  ~/.config/signal-bridge/token</span>
+<span class="new">Fix it with:</span>
+<span class="new">  chmod 600 ~/.config/signal-bridge/token</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">5 · The token file is not a valid token (existing check, re-wrapped)</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> The bridge token file is not a valid token:</span>
+<span class="new">  ~/.config/signal-bridge/token</span>
+<span class="new">Replace it with a new token: start with --new-token</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">6 · The token folder cannot be created (existing check, re-wrapped)</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+<span class="new"><span class="bad">Not starting.</span> Cannot create the folder for the bridge token (EEXIST):</span>
+<span class="new">  ~/.config/signal-bridge</span></div>
+</main>

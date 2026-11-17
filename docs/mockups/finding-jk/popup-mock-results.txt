@@ -1,0 +1,50 @@
+ok   sub-cent today        light dejavu     no scrollbar cost «$0.0070»
+FAIL sub-cent today        light dejavu     scrollbar    cost «$0.0070»  cut ['$0.0070']
+ok   sub-cent after-closed light dejavu     no scrollbar cost «<$0.01»
+ok   sub-cent after-closed light dejavu     scrollbar    cost «<$0.01»
+ok   sub-cent after-open   light dejavu     scrollbar    cost «<$0.01»
+ok   sub-cent after-open   light dejavu     scrollbar    cost «<$0.01»
+ok   sub-cent today        light liberation no scrollbar cost «$0.0070»
+ok   sub-cent today        light liberation scrollbar    cost «$0.0070»
+ok   sub-cent after-closed light liberation no scrollbar cost «<$0.01»
+ok   sub-cent after-closed light liberation scrollbar    cost «<$0.01»
+ok   sub-cent after-open   light liberation scrollbar    cost «<$0.01»
+ok   sub-cent after-open   light liberation scrollbar    cost «<$0.01»
+ok   sub-cent today        dark  dejavu     no scrollbar cost «$0.0070»
+FAIL sub-cent today        dark  dejavu     scrollbar    cost «$0.0070»  cut ['$0.0070']
+ok   sub-cent after-closed dark  dejavu     no scrollbar cost «<$0.01»
+ok   sub-cent after-closed dark  dejavu     scrollbar    cost «<$0.01»
+ok   sub-cent after-open   dark  dejavu     scrollbar    cost «<$0.01»
+ok   sub-cent after-open   dark  dejavu     scrollbar    cost «<$0.01»
+ok   sub-cent today        dark  liberation no scrollbar cost «$0.0070»
+ok   sub-cent today        dark  liberation scrollbar    cost «$0.0070»
+ok   sub-cent after-closed dark  liberation no scrollbar cost «<$0.01»
+ok   sub-cent after-closed dark  liberation scrollbar    cost «<$0.01»
+ok   sub-cent after-open   dark  liberation scrollbar    cost «<$0.01»
+ok   sub-cent after-open   dark  liberation scrollbar    cost «<$0.01»
+ok   dollars  today        light dejavu     no scrollbar cost «$21.83»
+ok   dollars  today        light dejavu     scrollbar    cost «$21.83»
+ok   dollars  after-closed light dejavu     no scrollbar cost «$21.83»
+ok   dollars  after-closed light dejavu     scrollbar    cost «$21.83»
+ok   dollars  after-open   light dejavu     scrollbar    cost «$21.83»
+ok   dollars  after-open   light dejavu     scrollbar    cost «$21.83»
+ok   dollars  today        light liberation no scrollbar cost «$21.83»
+ok   dollars  today        light liberation scrollbar    cost «$21.83»
+ok   dollars  after-closed light liberation no scrollbar cost «$21.83»
+ok   dollars  after-closed light liberation scrollbar    cost «$21.83»
+ok   dollars  after-open   light liberation scrollbar    cost «$21.83»
+ok   dollars  after-open   light liberation scrollbar    cost «$21.83»
+ok   dollars  today        dark  dejavu     no scrollbar cost «$21.83»
+ok   dollars  today        dark  dejavu     scrollbar    cost «$21.83»
+ok   dollars  after-closed dark  dejavu     no scrollbar cost «$21.83»
+ok   dollars  after-closed dark  dejavu     scrollbar    cost «$21.83»
+ok   dollars  after-open   dark  dejavu     scrollbar    cost «$21.83»
+ok   dollars  after-open   dark  dejavu     scrollbar    cost «$21.83»
+ok   dollars  today        dark  liberation no scrollbar cost «$21.83»
+ok   dollars  today        dark  liberation scrollbar    cost «$21.83»
+ok   dollars  after-closed dark  liberation no scrollbar cost «$21.83»
+ok   dollars  after-closed dark  liberation scrollbar    cost «$21.83»
+ok   dollars  after-open   dark  liberation scrollbar    cost «$21.83»
+ok   dollars  after-open   dark  liberation scrollbar    cost «$21.83»
+
+(today is shown for comparison: its failures are findings J/K themselves, not counted)

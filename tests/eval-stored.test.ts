@@ -7,7 +7,7 @@ import { buildSync } from 'esbuild';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadDataset } from '../eval/lib';
 import { PROMPT_VERSION } from '../src/classifier/prompt';
-import { cls, gem, noise } from './helpers';
+import { cls, fpFor, gem, noise } from './helpers';
 
 const dir = mkdtempSync(join(tmpdir(), 'signal-eval-'));
 const write = (name: string, rows: unknown[]) => {
@@ -44,6 +44,34 @@ describe('loadDataset with exported feedback', () => {
   });
 });
 
+describe('loadDataset: repeated-template fields (T10)', () => {
+  const ANCHOR = fpFor('anchor');
+  it('accepts and keeps repeat_of + repeat_similarity, and a family name', () => {
+    const rows = loadDataset(write('rep-ok.jsonl', [
+      row('a', 'keep', { ...stored(noise(0.97)), repeat_of: ANCHOR, repeat_similarity: 0.9 }),
+      row('b', 'keep', { family: 'announce' }),
+    ]));
+    expect(rows[0]).toMatchObject({ repeat_of: ANCHOR, repeat_similarity: 0.9 });
+    expect(rows[1]).toMatchObject({ family: 'announce' });
+  });
+
+  it('rejects malformed values with the line number', () => {
+    const cases: [Record<string, unknown>, RegExp][] = [
+      [{ repeat_of: 'nope', repeat_similarity: 0.9 }, /rep-bad\.jsonl:2: bad repeat_of/],
+      [{ repeat_of: ANCHOR, repeat_similarity: 0.5 }, /rep-bad\.jsonl:2: bad repeat_similarity/],
+      [{ repeat_of: ANCHOR, repeat_similarity: '0.9' }, /rep-bad\.jsonl:2: bad repeat_similarity/],
+      [{ repeat_of: ANCHOR }, /rep-bad\.jsonl:2: bad repeat_similarity/],
+      [{ repeat_similarity: 0.9 }, /rep-bad\.jsonl:2: bad repeat_of/],
+      [{ family: 5 }, /rep-bad\.jsonl:2: bad family/],
+      [{ family: '' }, /rep-bad\.jsonl:2: bad family/],
+    ];
+    for (const [extra, msg] of cases) {
+      const p = write('rep-bad.jsonl', [row('ok', 'keep'), row('x', 'keep', { ...stored(noise()), ...extra })]);
+      expect(() => loadDataset(p), JSON.stringify(extra)).toThrow(msg);
+    }
+  });
+});
+
 describe('npm run eval -- --mode stored', () => {
   let bundle: string;
   beforeAll(() => {
@@ -75,6 +103,20 @@ describe('npm run eval -- --mode stored', () => {
     expect(out).not.toContain('raw predictions saved');
   });
 
+  it('prints corrections on copied verdicts separately (T10)', () => {
+    const ANCHOR = fpFor('anchor');
+    const copied = (c: unknown) => ({ ...stored(c), repeat_of: ANCHOR, repeat_similarity: 0.9 });
+    const r = run('--file', write('copied.jsonl', [...exported, row('x', 'keep', copied(noise(0.97))), row('y', 'collapse', copied(cls()))]), '--mode', 'stored');
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toContain(`group model=m prompt=${PROMPT_VERSION}: 8 rows`);
+    expect(r.stdout).toContain('copied from a similar post (2): relaxed hidden 1 missed 1 | balanced hidden 1 missed 1 | strict hidden 1 missed 1');
+  });
+
+  it('prints no copied line when nothing was copied', () => {
+    const r = run('--file', write('export2.jsonl', exported), '--mode', 'stored');
+    expect(r.stdout).not.toContain('copied from a similar post');
+  });
+
   it('says so when nothing in the file has a stored classification', () => {
     const r = run('--file', write('legacy.jsonl', [row('x', 'keep'), row('y', 'collapse')]), '--mode', 'stored');
     expect(r.status, r.stderr).toBe(0);
@@ -91,6 +133,13 @@ describe('npm run eval -- --mode stored', () => {
     expect(r.status, r.stderr).toBe(0);
     expect(r.stdout).not.toMatch(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/);
     expect(r.stdout).toContain('user-?[31mred?[0m');
+  });
+
+  it('prints U+061C (Arabic letter mark, a bidi control) as "?" too (security S1)', () => {
+    const r = run('--file', write('alm.jsonl', [{ ...row('a', 'keep', stored(noise(0.99))), id: 'user-\u061cx' }]), '--mode', 'stored');
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).not.toContain('\u061c');
+    expect(r.stdout).toContain('user-?x');
   });
 
   it('the keyword baseline still runs offline (regression guard)', () => {

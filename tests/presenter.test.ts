@@ -150,3 +150,104 @@ describe('content.css', () => {
     expect(css).toMatch(/\[data-signal="highlight"\]\s*\{[^}]*box-shadow/);
   });
 });
+
+describe('a verdict copied from a similar post (T8)', () => {
+  const NOTE = 'Same template as a post judged earlier';
+  const repeat = (similarity = 0.92, judging = false) => ({ repeat: { similarity, judging } });
+  const acts = () => ({ ...actions(), judgeSeparately: vi.fn() }) as any as Actions & Record<string, ReturnType<typeof vi.fn>>;
+  const note = () => bar().querySelector<HTMLElement>('.note');
+  const judgeButton = () => Array.from(bar().querySelectorAll('button')).find((b) => b.textContent === 'Judge separately');
+
+  /** The five bars that show a model verdict (mockup states 1, 2, 5, 6 and 7). */
+  const MODEL_BARS: [string, Partial<View>, string[]][] = [
+    ['Active, collapsed', { outcome: 'collapse', review: false, reason: 'Bait' }, ['Show post', 'Worth keeping', 'Judge separately']],
+    ['Active, revealed', { outcome: 'collapse', review: false, revealed: true, reason: 'Bait' }, ['Hide again', 'Worth keeping', 'Judge separately']],
+    ['Active, expanded to read', { outcome: 'collapse', review: false, revealed: true, visibleBecause: 'expanded', reason: 'Bait' }, ['Hide', 'Worth keeping', 'Judge separately']],
+    ['Review, would collapse', { outcome: 'collapse', review: true, reason: 'Bait', confidence: 0.93 }, ['Worth keeping', 'Judge separately']],
+    ['Review, kept (quiet row)', { outcome: 'keep', review: true }, ['Judge separately', 'Low quality']],
+  ];
+
+  for (const [name, v, expectedButtons] of MODEL_BARS) {
+    it(`${name}: adds the note row with "Judge separately", keeping the bar's own buttons`, () => {
+      presenter.apply(post, view({ ...v, ...repeat() }), acts());
+      expect(bar().classList.contains('has-note')).toBe(true);
+      expect(note()!.textContent).toBe(`${NOTE} · Judge separately`);
+      expect(buttons()).toEqual(expectedButtons);
+    });
+
+    it(`${name}: no note when the verdict is the post's own`, () => {
+      presenter.apply(post, view(v), acts());
+      expect(note()).toBeNull();
+      expect(bar().classList.contains('has-note')).toBe(false);
+      expect(buttons()).not.toContain('Judge separately');
+    });
+  }
+
+  it('the note sits outside the 2-line-clamped reason, so it is never cut off', () => {
+    presenter.apply(post, view({ outcome: 'collapse', review: false, reason: 'Bait', ...repeat() }), acts());
+    expect(bar().querySelector('.reason .note')).toBeNull();
+    expect(note()!.parentElement).toBe(bar());
+  });
+
+  it('gives the similarity on hover and to screen readers', () => {
+    presenter.apply(post, view({ outcome: 'collapse', review: false, reason: 'Bait', ...repeat(0.876) }), acts());
+    expect(note()!.title).toBe('Verdict copied from a post that is 88% similar. No model call was made for this post.');
+    expect(judgeButton()!.getAttribute('aria-label')).toBe('Judge separately. Verdict copied from a post that is 88% similar.');
+    expect(judgeButton()!.getAttribute('type')).toBe('button');
+    expect(judgeButton()!.classList.contains('link')).toBe(true);
+  });
+
+  it('the quiet row\'s tooltip mentions the copy', () => {
+    presenter.apply(post, view({ outcome: 'keep', review: true, ...repeat(0.88) }), acts());
+    const low = Array.from(bar().querySelectorAll('button')).find((b) => b.textContent === 'Low quality')!;
+    expect(low.title).toBe('Kept (model 72% confident): Ordinary post · Same template as a post judged earlier (88% similar)');
+    expect(low.getAttribute('aria-label')).toBe('Mark low quality. Kept (model 72% confident): Ordinary post · Same template as a post judged earlier (88% similar)');
+  });
+
+  it('while judging: "Judging…" instead of the button', () => {
+    presenter.apply(post, view({ outcome: 'collapse', review: false, reason: 'Bait', ...repeat(0.92, true) }), acts());
+    expect(note()!.textContent).toBe(`${NOTE} · Judging…`);
+    expect(judgeButton()).toBeUndefined();
+    expect(buttons()).toEqual(['Show post', 'Worth keeping']);
+  });
+
+  it('a post you marked shows no note: your mark decides, whatever the verdict behind it', () => {
+    presenter.apply(post, view({ source: 'user', outcome: 'collapse', reason: 'You marked this low quality.', review: false, ...repeat() }), acts());
+    expect(note()).toBeNull();
+    expect(buttons()).toEqual(['Show post', 'Undo']);
+    presenter.apply(post, view({ source: 'user', outcome: 'keep', reason: 'You marked this worth keeping.', ...repeat() }), acts());
+    expect(note()).toBeNull();
+  });
+
+  it('clicking "Judge separately" calls the action once, and the click does not reach LinkedIn', () => {
+    const a = acts();
+    const outside = vi.fn();
+    document.getElementById('feed')!.addEventListener('click', outside);
+    presenter.apply(post, view({ outcome: 'collapse', review: false, reason: 'Bait', ...repeat() }), a);
+    judgeButton()!.click();
+    expect(a.judgeSeparately).toHaveBeenCalledTimes(1);
+    expect(a.show).not.toHaveBeenCalled();
+    expect(outside).not.toHaveBeenCalled();
+  });
+
+  it('ignores untrusted (page-script) clicks on "Judge separately"', () => {
+    const strict = new Presenter(document); // production default: isTrusted
+    const a = acts();
+    strict.apply(post, view({ outcome: 'collapse', review: false, reason: 'Bait', ...repeat() }), a);
+    judgeButton()!.click(); // jsdom clicks are untrusted
+    expect(a.judgeSeparately).not.toHaveBeenCalled();
+  });
+
+  it('builds the note with text only', () => {
+    presenter.apply(post, view({ outcome: 'collapse', review: false, reason: '<img src=x onerror="window.__pwned2=1">', ...repeat() }), acts());
+    expect(root()!.querySelector('img')).toBeNull();
+    expect((window as any).__pwned2).toBeUndefined();
+  });
+
+  it('ships the approved note styles in the bar stylesheet', () => {
+    const src = readFileSync('src/content/presenter.ts', 'utf8');
+    expect(src).toContain('.bar.has-note { flex-wrap: wrap;');
+    expect(src).toContain('.bar.has-note .reason { flex: 1 1 0; }');
+    expect(src).toMatch(/\.bar \.note \{[^}]*flex: 1 0 100%/);
+  });
+});

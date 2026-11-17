@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClassifyService } from '../src/background/classifyService';
 import { createHandler } from '../src/background/handlers';
-import { CacheStore, FeedbackStore, SettingsStore, StatsStore } from '../src/background/store';
+import { CacheStore, FeedbackStore, SettingsStore, StatsStore, emptyStats } from '../src/background/store';
 import { decide } from '../src/policy';
 import { DEFAULT_SETTINGS, configProblem, normalizeSettings, toPublic } from '../src/shared/settings';
 import { fingerprint, prepareInput } from '../src/shared/post';
@@ -67,6 +67,33 @@ describe('settings', () => {
     expect(reloaded).toMatchObject({ apiKey: 'sk-1', model: 'm', mode: 'active' });
     expect(JSON.stringify(toPublic(reloaded))).not.toContain('sk-1');
     expect(toPublic(reloaded).hasApiKey).toBe(true);
+  });
+});
+
+describe('repeated templates: setting and statistics (T3)', () => {
+  it('"Recognise repeated templates" is on by default and survives normalisation', () => {
+    expect(DEFAULT_SETTINGS.repeats).toBe(true);
+    expect(normalizeSettings({}).repeats).toBe(true);
+    expect(normalizeSettings({ repeats: false }).repeats).toBe(false);
+    for (const junk of ['no', 0, 1, null, {}, 'false']) expect(normalizeSettings({ repeats: junk }).repeats).toBe(true);
+    expect(toPublic(normalizeSettings({ repeats: false })).repeats).toBe(false);
+  });
+
+  it('persists the setting', async () => {
+    const kv = memoryKV();
+    await new SettingsStore(kv).save({ repeats: false });
+    expect((await new SettingsStore(kv).load()).repeats).toBe(false);
+  });
+
+  it('session statistics count repeats separately, and older stored statistics gain the counter', async () => {
+    expect(emptyStats().repeatHits).toBe(0);
+    const kv = memoryKV();
+    kv.data.stats = { httpRequests: 1, classified: 1, cacheHits: 2, failures: 0, promptTokens: 5, completionTokens: 5, totalLatencyMs: 9 };
+    const s = new StatsStore(kv);
+    expect((await s.get()).repeatHits).toBe(0);
+    await s.bump({ repeatHits: 2 });
+    expect((await s.get()).repeatHits).toBe(2);
+    expect((await s.get()).cacheHits).toBe(2);
   });
 });
 

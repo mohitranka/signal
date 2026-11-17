@@ -18,7 +18,7 @@ import { cls, gem, noise } from './helpers';
 const SETTLE_MS = 30;
 const settings = (over: Partial<PublicSettings> = {}): PublicSettings => ({
   enabled: true, mode: 'active', sensitivity: 'balanced', highlight: true, endpoint: 'https://x/v1', model: 'm',
-  concurrency: 3, timeoutMs: 30000, jsonMode: true, inputPricePerM: null, outputPricePerM: null, hasApiKey: true, ...over,
+  concurrency: 3, timeoutMs: 30000, jsonMode: true, inputPricePerM: null, outputPricePerM: null, hasApiKey: true, repeats: true, ...over,
 });
 
 // Cut-off and full texts. The fake model judges by content, like the real one.

@@ -6,7 +6,7 @@ import { loadDataset } from '../eval/lib';
 import { PROMPT_VERSION } from '../src/classifier/prompt';
 import { correctionReport, partitionCorrections, rowsToInputs } from '../src/corrections';
 import { COLLAPSE_CONFIDENCE } from '../src/policy';
-import { cls, gem, noise, record } from './helpers';
+import { cls, fpFor, gem, noise, record } from './helpers';
 
 vi.mock('../src/scoring', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/scoring')>();
@@ -276,11 +276,11 @@ describe('session', () => {
     expect($('stClassified').textContent).toBe('2');
     expect($('stCache').textContent).toBe('4');
     expect($('stTokens').textContent).toBe('1.5k');
-    expect($('stCost').textContent).toBe('$0.0020');
-    expect($('stClassified').parentElement.title).toBe('3 HTTP requests · avg latency 150 ms');
-    expect($('stCache').parentElement.title).toBe('7 entries stored');
-    expect($('stTokens').parentElement.title).toBe('1,000 in · 500 out');
-    expect($('stCost').parentElement.title).toBe('Estimated from your configured prices');
+    expect($('stCost').textContent).toBe('<$0.01'); // finding K: under a cent (the exact amount is in the tooltip and the details)
+    expect($('stClassified').parentElement.title).toBe('2 · 3 HTTP requests · avg latency 150 ms'); // F: value first
+    expect($('stCache').parentElement.title).toBe('4 · 7 entries stored');
+    expect($('stTokens').parentElement.title).toBe('1.5k · 1,000 in · 500 out');
+    expect($('stCost').parentElement.title).toBe('<$0.01 · $0.0020 estimated from your configured prices');
   });
 
   it('sums up this tab in one line, with session failures in red', async () => {
@@ -295,7 +295,8 @@ describe('session', () => {
     await load();
     expect($('stCost').textContent).toBe('—');
     expect($('stCost').parentElement.title).toMatch(/Model › Advanced/);
-    expect($('stClassified').parentElement.title).toBe('3 HTTP requests');
+    expect($('stCost').parentElement.title.startsWith('—')).toBe(false); // F: no "— ·" prefix when there is no value
+    expect($('stClassified').parentElement.title).toBe('0 · 3 HTTP requests');
     expect($('stats').textContent).toBe('');
   });
 
@@ -543,5 +544,96 @@ describe('export', () => {
     const report = correctionReport(included);
     expect(excluded).toHaveLength(3);
     expect(report.rows.map((r) => [String(r.wronglyHidden), String(r.missed)])).toEqual(corrCells().map((c) => [c[1], c[2]]));
+  });
+});
+
+describe('repeated templates (T11)', () => {
+  const ANCHOR = fpFor('anchor');
+  const copiedEntry = (verdict: 'keep' | 'collapse', c: ReturnType<typeof cls>, at = 10) =>
+    ({ verdict, at, sample: 'copied post', classified: { ...rec(c), repeatOf: { fp: ANCHOR, similarity: 0.9 } } });
+
+  it('has a "Recognise repeated templates" switch under Model › Advanced, reflecting the setting', async () => {
+    setup({ getSettings: () => ({ ...settings, repeats: true }) });
+    await load();
+    expect($('repeats').checked).toBe(true);
+    expect($('repeats').getAttribute('role')).toBe('switch');
+    expect($('repeats').closest('details.advanced')).not.toBeNull();
+    expect(text('label[for=repeats], .toggle-row.setting')).toContain('Recognise repeated templates');
+    expect($('repeatsHelp').textContent).toBe('Posts of 40+ words that match one already judged, with a name, number or emoji changed, reuse its verdict instead of calling the model.');
+
+    setup({ getSettings: () => ({ ...settings, repeats: false }) });
+    await load();
+    expect($('repeats').checked).toBe(false);
+  });
+
+  it('applies on Save, like the other Advanced fields', async () => {
+    setup({ getSettings: () => ({ ...settings, repeats: true }) });
+    await load();
+    $('repeats').checked = false;
+    $('repeats').dispatchEvent(new Event('change', { bubbles: true }));
+    await flush();
+    expect(sent.some((m) => m.type === 'saveSettings')).toBe(false);
+    $('save').click();
+    await flush();
+    expect(sent.find((m) => m.type === 'saveSettings').patch.repeats).toBe(false);
+  });
+
+  it('This session shows five figures; repeats sits between cache hits and tokens, with the index size on hover', async () => {
+    setup({ getStats: () => ({ stats: { ...stats, repeatHits: 23 }, cacheSize: 7, repeatIndexSize: 97, prices: { input: 1, output: 2 } }) });
+    await load();
+    // (.sr: the screen-reader text of a rounded value, finding K; not a label)
+    expect(all('#statsBox .tile span:not(.sr)').map((s) => s.textContent)).toEqual(['classified', 'cache hits', 'repeats', 'tokens', 'est. cost']);
+    expect($('stRepeats').textContent).toBe('23');
+    expect($('stRepeats').parentElement.title).toBe('23 · Copied from a similar post · no model call · 97 stored');
+  });
+
+  it('shows 0 repeats when there are none yet, and abbreviates large counts', async () => {
+    setup({ getStats: () => ({ stats, cacheSize: 7, repeatIndexSize: 0, prices: { input: 1, output: 2 } }) });
+    await load();
+    expect($('stRepeats').textContent).toBe('0');
+    expect($('stRepeats').parentElement.title).toBe('0 · Copied from a similar post · no model call · 0 stored');
+    setup({ getStats: () => ({ stats: { ...stats, repeatHits: 1234 }, cacheSize: 7, repeatIndexSize: 1, prices: { input: 1, output: 2 } }) });
+    await load();
+    expect($('stRepeats').textContent).toBe('1.2k');
+    expect($('stRepeats').parentElement.title).toBe('1.2k · Copied from a similar post · no model call · 1 stored');
+  });
+
+  it('Your corrections: one line for corrections on copied verdicts, at the current sensitivity', async () => {
+    setup({ listFeedback: () => ({ ...structuredClone(FEEDBACK), x: copiedEntry('keep', noise(0.97)), y: copiedEntry('collapse', cls()), z: copiedEntry('keep', cls()) }) });
+    await load();
+    expect($('corrCopied').hidden).toBe(false);
+    expect($('corrCopied').textContent).toBe('On verdicts copied from a similar post: 1 wrongly hidden, 1 missed at Strict (3 corrections).');
+    await pick('sensitivity', 'relaxed');
+    expect($('corrCopied').textContent).toBe('On verdicts copied from a similar post: 1 wrongly hidden, 1 missed at Relaxed (3 corrections).');
+  });
+
+  it('says "1 correction" for one, and hides the line when none were copied', async () => {
+    setup({ listFeedback: () => ({ ...structuredClone(FEEDBACK), x: copiedEntry('keep', cls()) }) });
+    await load();
+    expect($('corrCopied').textContent).toBe('On verdicts copied from a similar post: 0 wrongly hidden, 0 missed at Strict (1 correction).');
+    setup();
+    await load();
+    expect($('corrCopied').hidden).toBe(true);
+  });
+
+  it('exports repeat_of and repeat_similarity for corrections on copied verdicts only', async () => {
+    setup({ listFeedback: () => ({ x: copiedEntry('keep', noise(0.97)), a: FEEDBACK.a }) });
+    await load();
+    const lines = await exportLines();
+    const x = lines.find((l) => l.id === 'user-x');
+    expect(x).toMatchObject({ repeat_of: ANCHOR, repeat_similarity: 0.9, classification: noise(0.97), model: 'm', prompt_version: PROMPT_VERSION });
+    const a = lines.find((l) => l.id === 'user-a');
+    expect('repeat_of' in a).toBe(false);
+    expect('repeat_similarity' in a).toBe(false);
+  });
+
+  it('round-trips: the evaluator counts the same corrections on copied verdicts', async () => {
+    setup({ listFeedback: () => ({ ...structuredClone(FEEDBACK), x: copiedEntry('keep', noise(0.97)), y: copiedEntry('collapse', cls()) }) });
+    await load();
+    const lines = await exportLines();
+    const file = join(mkdtempSync(join(tmpdir(), 'signal-rt-')), 'signal-feedback.jsonl');
+    writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    const { included } = partitionCorrections(rowsToInputs(loadDataset(file)), { model: 'm', promptVersion: PROMPT_VERSION });
+    expect(correctionReport(included).copiedTotal).toBe(2);
   });
 });

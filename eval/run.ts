@@ -11,6 +11,9 @@
  * --mode stored scores exported feedback (popup "Export JSONL") from the classifications stored with it:
  *   npm run eval -- --file signal-feedback.jsonl --mode stored
  * No API calls and no credentials; rows are grouped by model and prompt version.
+ *
+ * --mode repeats reports which rows would be treated as the same template (repeated-template matching), offline:
+ *   npm run eval -- --file eval/repeats.jsonl --mode repeats
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { baselineClassify } from './baseline';
@@ -20,6 +23,7 @@ import { printable } from '../src/classifier/parse';
 import { TaskQueue } from '../src/classifier/queue';
 import { MIN_PER_SIDE, correctionReport, groupCorrections, rowsToInputs } from '../src/corrections';
 import { prepareInput } from '../src/shared/post';
+import { repeatReport } from './repeats';
 
 const args = process.argv.slice(2);
 const opt = (name: string): string | undefined => {
@@ -42,6 +46,7 @@ async function main() {
     console.log(`dataset ${file}: ${rows.length} rows (${rows.filter((r) => r.source === 'synthetic').length} synthetic)`);
 
     if (mode === 'stored') return reportStored(rows);
+    if (mode === 'repeats') return reportRepeats(rows);
     if (mode === 'baseline') {
       preds = rows.map((row) => ({ row, classification: baselineClassify(toInput(row)) }));
     } else {
@@ -110,10 +115,50 @@ function reportStored(rows: Row[]): void {
     if (!r.hiddenMeaningful || !r.missedMeaningful) {
       console.log(`  too few to judge: need ${MIN_PER_SIDE}+ worth keeping and ${MIN_PER_SIDE}+ low quality (have ${r.keptTotal} and ${r.lowQualityTotal})`);
     }
+    if (r.copiedTotal > 0) {
+      const parts = r.rows.map((x) => `${x.sensitivity} hidden ${x.copiedWronglyHidden ?? 0} missed ${x.copiedMissed ?? 0}`);
+      console.log(`  copied from a similar post (${r.copiedTotal}): ${parts.join(' | ')}`);
+    }
     const fp = score(g.included, 'balanced').falsePositives;
     if (fp.length) console.log(`  balanced false positives: ${fp.map(printable).join(', ')}`);
   }
   if (excluded.length) console.log(`\nleft out (no stored classification): ${excluded.length} (${excluded.map((x) => printable(x.id)).join(', ')})`);
+}
+
+/** Which rows the signature treats as the same template (docs/design-repeats.md), offline. */
+function reportRepeats(rows: Row[]): void {
+  const r = repeatReport(rows);
+  const byId = new Map(rows.map((x) => [x.id, x]));
+  const preview = (id: string) => printable((byId.get(id)?.text ?? '').replace(/\s+/g, ' ').slice(0, 120));
+  const under = r.unsigned.length;
+  console.log('mode repeats: offline, no API calls');
+  console.log(`signed ${r.signed} of ${r.rows} rows (${under} under ${r.minWords} words: exact match only)`);
+  console.log(`threshold ${r.threshold} · minimum ${r.minWords} words · signature v${r.version}`);
+
+  const different = r.pairs.filter((p) => !p.sameLabel);
+  console.log(`\nmatched pairs: ${r.pairs.length}`);
+  console.log(`  same label:      ${r.pairs.length - different.length}`);
+  console.log(`  different label: ${different.length}`);
+  for (const p of different) {
+    console.log(`    ${printable(p.a)} ↔ ${printable(p.b)}  ${p.similarity.toFixed(2)}  ${p.labels[0]} ≠ ${p.labels[1]}`);
+    console.log(`      ${printable(p.a)}: ${preview(p.a)}`);
+    console.log(`      ${printable(p.b)}: ${preview(p.b)}`);
+  }
+
+  if (r.families.length) {
+    console.log('\ntemplate families (rows sharing a "family" field):');
+    for (const f of r.families) {
+      const missed = f.missed.map((m) => `${printable(m.id)} (best ${m.best.toFixed(2)})`).join(', ');
+      console.log(`  ${printable(f.family)}  ${f.matched}/${f.size} rows matched together${missed ? `  missed: ${missed}` : ''}`);
+    }
+  } else {
+    console.log('\ntemplate families: none in this file');
+  }
+
+  const negatives = rows.filter((x) => x.category === 'repeat-negative').length;
+  const matchedNegatives = new Set(r.negativesMatched.map((n) => n.id)).size;
+  console.log(`hard negatives matched to anything: ${matchedNegatives} of ${negatives}`);
+  for (const n of r.negativesMatched) console.log(`  ${printable(n.id)} ~ ${printable(n.with)}  ${n.similarity.toFixed(2)}`);
 }
 
 main().catch((e) => {

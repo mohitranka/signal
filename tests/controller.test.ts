@@ -10,7 +10,7 @@ import { PROMPT_VERSION } from '../src/classifier/prompt';
 
 const settings = (over: Partial<PublicSettings> = {}): PublicSettings => ({
   enabled: true, mode: 'active', sensitivity: 'balanced', highlight: true, endpoint: 'https://x/v1', model: 'm',
-  concurrency: 3, timeoutMs: 30000, jsonMode: true, inputPricePerM: null, outputPricePerM: null, hasApiKey: true, ...over,
+  concurrency: 3, timeoutMs: 30000, jsonMode: true, inputPricePerM: null, outputPricePerM: null, hasApiKey: true, repeats: true, ...over,
 });
 
 const POSTS = {

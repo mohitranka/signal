@@ -2,6 +2,8 @@ import { PROMPT_VERSION } from '../classifier/prompt';
 import { MIN_PER_SIDE, correctionReport, feedbackToInputs, partitionCorrections, type Excluded, type ExclusionReason } from '../corrections';
 import { COLLAPSE_CONFIDENCE } from '../policy';
 import { MAX_FEEDBACK_ENTRIES, isVerdict } from '../shared/feedback';
+import { REPEAT_MIN_WORDS } from '../shared/similarity';
+import { LOCAL_HOSTS } from '../shared/settings';
 import type { FeedbackEntry, Mode, PageStats, PopupMessage, PublicSettings, Sensitivity, Settings, Stats } from '../shared/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -26,6 +28,61 @@ const SENS_HELP: Record<Sensitivity, string> = {
   balanced: `Confident noise only · ${atLeast('balanced')}`,
   strict: `More aggressive, more mistakes · ${atLeast('strict')}`,
 };
+
+// ---- Local CLI bridge (docs/design-bridge.md §8) ------------------------------------------------
+const BRIDGE_ENDPOINT = 'http://127.0.0.1:8791/v1';
+/** The bridge serves `claude-code/<model>` or `codex/<model>`. */
+const BRIDGE_CLI = new Map([['claude-code', { label: 'Claude Code', cli: 'claude' }], ['codex', { label: 'Codex', cli: 'codex' }]]);
+const bridgeOf = (model: string | undefined) => BRIDGE_CLI.get(/^([a-z-]+)\//.exec(model ?? '')?.[1] ?? '');
+/** The form is set up for the bridge: its preset chosen, or a bridge model id typed (a bridge on another port is "Custom"). */
+/** Security B7: the bridge only ever listens on this computer; a bridge-like model id elsewhere is not the bridge. */
+function isLocal(endpoint: string | undefined): boolean {
+  try {
+    return LOCAL_HOSTS.has(new URL(endpoint ?? '').hostname);
+  } catch {
+    return false;
+  }
+}
+/** The saved settings are the bridge: a bridge model id on a local endpoint (chip, cost tile, Test connection). */
+const bridgeSaved = () => (isLocal(settings?.endpoint) ? bridgeOf(settings?.model) : undefined);
+/** The form is set up for the bridge: its preset, or a bridge model id with a local endpoint typed. */
+const bridgeForm = () =>
+  $<HTMLSelectElement>('preset').value === BRIDGE_ENDPOINT ||
+  (!!bridgeOf($<HTMLInputElement>('model').value.trim()) && isLocal($<HTMLInputElement>('endpoint').value.trim()));
+
+/** Test-connection problems in the bridge's words (auth and config already carry the bridge's own message). */
+function bridgeProblem(kind: string, message: string, cli: string): string {
+  if (kind === 'network') {
+    let where = '127.0.0.1:8791';
+    try {
+      where = new URL(settings?.endpoint ?? '').host;
+    } catch {
+      /* keep the default */
+    }
+    return `Could not reach the bridge at ${where}. Is it running? npm run bridge -- --cli ${cli}`;
+  }
+  if (kind === 'rate_limit') return 'The bridge is busy (one post at a time); Signal retries automatically.';
+  return message;
+}
+
+/** Token label, price fields and help line follow the form (mockups: docs/mockups/bridge/). */
+function applyBridgeForm(): void {
+  const bridge = bridgeForm();
+  $('apiKeyLabel').textContent = bridge ? 'Bridge token' : 'API key';
+  $('presetHelp').hidden = $<HTMLSelectElement>('preset').value !== BRIDGE_ENDPOINT;
+  for (const [id, stored] of [['inputPrice', settings?.inputPricePerM], ['outputPrice', settings?.outputPricePerM]] as const) {
+    const f = $<HTMLInputElement>(id);
+    if (bridge && !f.disabled) {
+      f.disabled = true;
+      f.value = '';
+      f.placeholder = 'not used';
+    } else if (!bridge && f.disabled) {
+      f.disabled = false;
+      f.value = stored === null || stored === undefined ? '' : String(stored);
+      f.placeholder = 'optional';
+    }
+  }
+}
 
 let settings: PublicSettings | null = null;
 let feedback: Record<string, FeedbackEntry> = {};
@@ -65,14 +122,19 @@ function fill(s: PublicSettings): void {
   $<HTMLInputElement>('timeoutS').value = String(s.timeoutMs / 1000);
   $<HTMLInputElement>('inputPrice').value = s.inputPricePerM === null ? '' : String(s.inputPricePerM);
   $<HTMLInputElement>('outputPrice').value = s.outputPricePerM === null ? '' : String(s.outputPricePerM);
+  $<HTMLInputElement>('repeats').checked = s.repeats === true;
+  $('repeatsHelp').textContent = `Posts of ${REPEAT_MIN_WORDS}+ words that match one already judged, with a name, number or emoji changed, reuse its verdict instead of calling the model.`;
   const preset = $<HTMLSelectElement>('preset');
   preset.value = [...preset.options].some((o) => o.value === s.endpoint) ? s.endpoint : '';
 
   const chip = $('llmChip');
-  chip.textContent = s.model ? (s.model.split('/').pop() || s.model) : 'Not set up';
+  // A bridge model shows which CLI serves it: "claude-code · sonnet" (the last segment alone would hide that).
+  chip.textContent = !s.model ? 'Not set up' : bridgeOf(s.model) && isLocal(s.endpoint) ? s.model.replace('/', ' · ') : s.model.split('/').pop() || s.model;
   chip.title = s.model || 'No model configured';
   chip.classList.toggle('warn', !s.model);
   if (!s.model) $<HTMLDetailsElement>('llm').open = true;
+  for (const id of ['inputPrice', 'outputPrice']) $<HTMLInputElement>(id).disabled = false; // re-applied below
+  applyBridgeForm();
 
   renderHeader(s);
 }
@@ -106,14 +168,16 @@ async function requestHostAccess(endpoint: string): Promise<boolean> {
 async function saveLlm(): Promise<boolean> {
   const endpoint = $<HTMLInputElement>('endpoint').value.trim();
   if (!(await requestHostAccess(endpoint))) return false;
+  // Bridge models have no per-token price: the stored prices stay as they are (for other providers) rather than being cleared.
+  const prices = bridgeForm() ? {} : { inputPricePerM: numOrNull('inputPrice'), outputPricePerM: numOrNull('outputPrice') };
   await patch({
     endpoint,
     model: $<HTMLInputElement>('model').value.trim(),
     apiKey: $<HTMLInputElement>('apiKey').value.trim(),
     concurrency: Number($<HTMLInputElement>('concurrency').value),
     timeoutMs: Number($<HTMLInputElement>('timeoutS').value) * 1000,
-    inputPricePerM: numOrNull('inputPrice'),
-    outputPricePerM: numOrNull('outputPrice'),
+    ...prices,
+    repeats: $<HTMLInputElement>('repeats').checked,
   });
   return true;
 }
@@ -131,24 +195,77 @@ function compact(n: number): string {
 }
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-function tile(id: string, value: string, title: string): void {
-  $(id).textContent = value;
-  $(id).parentElement!.title = title;
+/**
+ * A session tile. Its tooltip starts with the shown value, which a narrow tile may show with an ellipsis (finding F).
+ * `spoken`: what a screen reader reads instead of the shown value (finding K: "<$0.01" → "under 1 cent"); the tiles are
+ * updated in place, so it is set or cleared every time.
+ */
+function tile(id: string, value: string, title: string, spoken = ''): void {
+  const el = $(id);
+  el.textContent = value;
+  el.parentElement!.title = value === '—' ? title : `${value} · ${title}`;
+  const next = el.nextElementSibling;
+  const sr = next?.classList.contains('sr') ? next : null;
+  if (spoken) {
+    el.setAttribute('aria-hidden', 'true');
+    if (sr) sr.textContent = spoken;
+    else el.after(Object.assign(el.ownerDocument.createElement('span'), { className: 'sr', textContent: spoken }));
+  } else {
+    el.removeAttribute('aria-hidden');
+    sr?.remove();
+  }
+}
+
+/** Finding J: every tile's detail as a line of text, for keyboard, touch and screen-reader users (the tooltips stay). */
+function renderDetails(lines: [label: string, text: string][]): void {
+  // Replaced inside the existing list, so the disclosure keeps its open or closed state across refreshes.
+  $('statsDetailList').replaceChildren(
+    ...lines.map(([label, text]) => {
+      const li = el('li');
+      li.append(el('b', `${label}: `), text);
+      return li;
+    }),
+  );
 }
 
 async function refreshStats(): Promise<void> {
-  const r = await send<{ stats: Stats; cacheSize: number; prices: { input: number | null; output: number | null } }>({ type: 'getStats' });
+  const r = await send<{ stats: Stats; cacheSize: number; repeatIndexSize?: number; prices: { input: number | null; output: number | null } }>({ type: 'getStats' });
   const s = r.stats;
-  const latency = s.classified > 0 ? ` · avg latency ${Math.round(s.totalLatencyMs / s.classified)} ms` : '';
-  tile('stClassified', compact(s.classified), `${plural(s.httpRequests, 'HTTP request', 'HTTP requests')}${latency}`);
-  tile('stCache', compact(s.cacheHits), plural(r.cacheSize, 'entry stored', 'entries stored'));
-  tile('stTokens', compact(s.promptTokens + s.completionTokens), `${s.promptTokens.toLocaleString()} in · ${s.completionTokens.toLocaleString()} out`);
-  if (r.prices.input !== null && r.prices.output !== null) {
+  const n = (x: number) => x.toLocaleString();
+  const latency = s.classified > 0 ? ` · avg latency ${n(Math.round(s.totalLatencyMs / s.classified))} ms` : '';
+  const requests = `${plural(s.httpRequests, 'HTTP request', 'HTTP requests')}${latency}`;
+  const stored = plural(r.cacheSize, 'entry stored', 'entries stored');
+  const repeats = `${n(s.repeatHits ?? 0)} copied from a similar post · no model call · ${n(r.repeatIndexSize ?? 0)} stored`;
+  const tokens = `${n(s.promptTokens)} in · ${n(s.completionTokens)} out`;
+  tile('stClassified', compact(s.classified), requests);
+  tile('stCache', compact(s.cacheHits), stored);
+  tile('stRepeats', compact(s.repeatHits ?? 0), `Copied from a similar post · no model call · ${n(r.repeatIndexSize ?? 0)} stored`);
+  tile('stTokens', compact(s.promptTokens + s.completionTokens), tokens);
+  let costLine: [string, string];
+  const bridge = bridgeSaved();
+  if (bridge) {
+    // Security B4: "Plan" (normally a subscription), but billing is however the CLI itself is set up.
+    const how = `through your ${bridge.label} login via the local bridge · no per-token estimate (billed as your CLI is set up)`;
+    tile('stCost', 'Plan', how[0]!.toUpperCase() + how.slice(1));
+    costLine = ['Plan', how];
+  } else if (r.prices.input !== null && r.prices.output !== null) {
     const cost = (s.promptTokens * r.prices.input + s.completionTokens * r.prices.output) / 1e6;
-    tile('stCost', `$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`, 'Estimated from your configured prices');
+    // Finding K: a tile has room for "<$0.01" but not for "$0.0070"; the exact amount is in the tooltip and the details.
+    const exact = cost === 0 ? '$0.00' : `$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`;
+    const shown = cost === 0 ? '$0.00' : cost < 0.01 ? '<$0.01' : exact;
+    tile('stCost', shown, shown === exact ? 'Estimated from your configured prices' : `${exact} estimated from your configured prices`, shown === '<$0.01' ? 'under 1 cent' : '');
+    costLine = ['Estimated cost', `${exact} from your configured prices`];
   } else {
     tile('stCost', '—', 'Add $/1M token prices under Model › Advanced');
+    costLine = ['Estimated cost', 'add $/1M token prices under Model › Advanced'];
   }
+  renderDetails([
+    ['Classified', `${n(s.classified)} posts · ${requests}`],
+    ['Cache hits', `${n(s.cacheHits)} · ${stored}`],
+    ['Repeats', repeats],
+    ['Tokens', tokens],
+    costLine,
+  ]);
 
   const parts: (string | HTMLElement)[] = [];
   try {
@@ -242,7 +359,9 @@ function renderCorrections(): void {
   const empty = $('corrEmpty');
   const notes = $('corrNotes');
   const target = $('corrTarget');
+  const copiedLine = $('corrCopied');
   notes.replaceChildren();
+  copiedLine.hidden = true;
   const showEmpty = (text: string) => {
     table.hidden = true;
     empty.hidden = false;
@@ -293,6 +412,19 @@ function renderCorrections(): void {
     }),
   );
 
+  // Corrections on verdicts copied from a similar post, at the current sensitivity (same report, same score()).
+  if (r.copiedTotal > 0) {
+    const row = r.rows.find((x) => x.sensitivity === settings!.sensitivity)!;
+    copiedLine.replaceChildren(
+      'On verdicts copied from a similar post: ',
+      el('b', String(row.copiedWronglyHidden ?? 0)),
+      ' wrongly hidden, ',
+      el('b', String(row.copiedMissed ?? 0)),
+      ` missed at ${SENS_LABEL[row.sensitivity]} (${r.copiedTotal} correction${r.copiedTotal === 1 ? '' : 's'}).`,
+    );
+    copiedLine.hidden = false;
+  }
+
   const note = (t: string) => notes.append(el('li', t));
   if (!r.hiddenMeaningful && !r.missedMeaningful) {
     note(`Too few to judge yet: ${MIN_PER_SIDE}+ of each needed (you have ${r.keptTotal} kept, ${r.lowQualityTotal} low quality).`);
@@ -315,6 +447,8 @@ async function exportFeedback(): Promise<void> {
       model_confidence: e.modelConfidence,
       // The classification this entry corrected, so `npm run eval -- --mode stored` can score it with no API calls.
       ...(e.classified ? { classification: e.classified.classification, model: e.classified.model, prompt_version: e.classified.promptVersion } : {}),
+      // The classification was copied from a similar post: which one, and how similar (eval counts these separately).
+      ...(e.classified?.repeatOf ? { repeat_of: e.classified.repeatOf.fp, repeat_similarity: e.classified.repeatOf.similarity } : {}),
       // A corrupted timestamp must not break the whole export: leave it out.
       ...(Number.isFinite(new Date(e.at).getTime()) ? { at: new Date(e.at).toISOString() } : {}),
     }),
@@ -339,7 +473,15 @@ async function init(): Promise<void> {
   $('preset').addEventListener('change', (e) => {
     const v = (e.target as HTMLSelectElement).value;
     if (v) $<HTMLInputElement>('endpoint').value = v;
+    if (v === BRIDGE_ENDPOINT) {
+      // The bridge runs one CLI call at a time, and a call takes seconds.
+      $<HTMLInputElement>('concurrency').value = '1';
+      $<HTMLInputElement>('timeoutS').value = '90';
+    }
+    applyBridgeForm();
   });
+  $('model').addEventListener('input', applyBridgeForm);
+  $('endpoint').addEventListener('input', applyBridgeForm);
 
   $('save').addEventListener('click', async () => {
     setStatus('');
@@ -349,8 +491,9 @@ async function init(): Promise<void> {
     setStatus('Testing…');
     if (!(await saveLlm())) return;
     const r = await send<{ ok: true; latencyMs: number; decision: string } | { ok: false; kind: string; message: string }>({ type: 'testConnection' });
-    if (r.ok) setStatus(`Connected · replied in ${r.latencyMs} ms (test post rated: ${r.decision})`);
-    else setStatus(`${r.kind}: ${r.message}${r.kind === 'network' ? ' (If this persists, check the endpoint URL and that host access was granted when saving.)' : ''}`, true);
+    const bridge = bridgeSaved();
+    if (r.ok) setStatus(`Connected · replied in ${r.latencyMs.toLocaleString('en-US')} ms (test post rated: ${r.decision})${bridge ? ` · via your ${bridge.label} login` : ''}`);
+    else setStatus(`${r.kind}: ${bridge ? bridgeProblem(r.kind, r.message, bridge.cli) : r.message}${!bridge && r.kind === 'network' ? ' (If this persists, check the endpoint URL and that host access was granted when saving.)' : ''}`, true);
     void refreshStats();
   });
 

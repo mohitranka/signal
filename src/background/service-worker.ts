@@ -1,6 +1,7 @@
 import type { BackgroundMessage } from '../shared/types';
 import { ClassifyService } from './classifyService';
 import { createHandler } from './handlers';
+import { RepeatIndex } from './repeatIndex';
 import { isExtensionPage, waiterIdOf } from './sender';
 import { CacheStore, FeedbackStore, SettingsStore, StatsStore, chromeKV } from './store';
 
@@ -12,7 +13,8 @@ const settings = new SettingsStore(local);
 const cache = new CacheStore(local);
 const feedback = new FeedbackStore(local);
 const stats = new StatsStore(chromeKV(chrome.storage.session));
-const service = new ClassifyService({ loadSettings: () => settings.load(), cache, stats });
+const repeats = new RepeatIndex(local);
+const service = new ClassifyService({ loadSettings: () => settings.load(), cache, stats, repeats });
 
 const handle = createHandler({
   service,
@@ -20,6 +22,7 @@ const handle = createHandler({
   cache,
   feedback,
   stats,
+  repeats,
   notifyTabs: () => {
     chrome.tabs
       .query({ url: ['https://www.linkedin.com/*'] })
@@ -39,5 +42,8 @@ chrome.runtime.onMessage.addListener((msg: BackgroundMessage, sender, sendRespon
   return true; // async response
 });
 
-// Flush the cache before the worker is suspended.
-chrome.runtime.onSuspend?.addListener(() => void cache.flush());
+// Flush the cache and the repeat index before the worker is suspended.
+chrome.runtime.onSuspend?.addListener(() => {
+  void cache.flush();
+  void repeats.flush();
+});

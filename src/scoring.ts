@@ -25,6 +25,11 @@ export interface Row {
   model_decision?: Decision;
   model_confidence?: number;
   at?: string;
+  /** Exported feedback only: the classification was copied from a similar post (that post's fingerprint, estimate). */
+  repeat_of?: string;
+  repeat_similarity?: number;
+  /** eval/repeats.jsonl: rows that are the same template share a family name. */
+  family?: string;
 }
 
 export interface Prediction {
@@ -36,6 +41,8 @@ export interface Prediction {
   completionTokens?: number;
   httpRequests?: number;
   error?: string;
+  /** The classification was copied from a similar post, not produced for this one (user corrections only). */
+  copied?: boolean;
 }
 
 const ratio = (n: number, d: number) => (d === 0 ? null : n / d);

@@ -49,16 +49,18 @@
       <summary><span class="title">Model</span><span class="chip" id="llmChip"></span></summary>
       <div class="body">
         <label class="input">Provider
-          <select id="preset">
+          <select id="preset" aria-describedby="presetHelp">
             <option value="">Custom</option>
             <option value="https://openrouter.ai/api/v1">OpenRouter</option>
             <option value="https://api.openai.com/v1">OpenAI</option>
             <option value="http://localhost:11434/v1">Ollama (local)</option>
+            <option value="http://127.0.0.1:8791/v1">Local CLI bridge (Claude Code / Codex)</option>
           </select>
         </label>
+        <p class="preset-help" id="presetHelp" hidden>Uses the Claude Code or Codex CLI you are logged in to, through a small server on this computer. Start it with <code>npm run bridge -- --cli claude</code>, then paste the model and token it prints.</p>
         <label class="input">Endpoint<input id="endpoint" type="url" spellcheck="false"></label>
         <label class="input">Model<input id="model" type="text" spellcheck="false" placeholder="provider/model-name"></label>
-        <label class="input">API key<input id="apiKey" type="password" autocomplete="off" spellcheck="false"></label>
+        <label class="input"><span id="apiKeyLabel">API key</span><input id="apiKey" type="password" autocomplete="off" spellcheck="false"></label>
         <details class="advanced">
           <summary>Advanced</summary>
           <div class="grid2">
@@ -67,6 +69,11 @@
             <label class="input">$ / 1M input<input id="inputPrice" type="number" min="0" step="any" placeholder="optional"></label>
             <label class="input">$ / 1M output<input id="outputPrice" type="number" min="0" step="any" placeholder="optional"></label>
           </div>
+          <label class="toggle-row setting">
+            <span>Recognise repeated templates</span>
+            <span class="switch small"><input type="checkbox" id="repeats" role="switch" aria-describedby="repeatsHelp"><span class="track" aria-hidden="true"></span></span>
+          </label>
+          <p class="setting-help" id="repeatsHelp"></p>
         </details>
         <div class="actions">
           <button id="save" type="button" class="btn primary">Save</button>
@@ -81,10 +88,12 @@
       <div class="tiles">
         <div class="tile"><b id="stClassified">0</b><span>classified</span></div>
         <div class="tile"><b id="stCache">0</b><span>cache hits</span></div>
+        <div class="tile"><b id="stRepeats">0</b><span>repeats</span></div>
         <div class="tile"><b id="stTokens">0</b><span>tokens</span></div>
         <div class="tile"><b id="stCost">—</b><span>est. cost</span></div>
       </div>
       <p class="meta" id="stats"></p>
+      <details class="tile-details" id="statsDetails"><summary>Details</summary><ul id="statsDetailList"></ul></details>
     </section>
 
     <details class="card" id="corrBox">
@@ -102,6 +111,7 @@
           </thead>
           <tbody id="corrRows"></tbody>
         </table>
+        <p id="corrCopied" class="corr-copied" hidden></p>
         <ul id="corrNotes" class="notes"></ul>
         <details id="corrLeftOut" class="leftout" hidden>
           <summary id="corrLeftOutSummary"></summary>

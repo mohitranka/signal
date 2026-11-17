@@ -1,4 +1,5 @@
-/* Signal popup. Design tokens first; everything else uses them. */
+/* Signal popup. Design tokens first; everything else uses them.
+   Every text colour pair meets WCAG AA 4.5:1 in light and dark (finding G); tests/contrast.test.ts computes them all. */
 :root {
   color-scheme: light dark;
   --bg: #f5f6f8;
@@ -6,12 +7,12 @@
   --surface-2: #f0f2f4;
   --border: #e3e6ea;
   --text: #1c1f23;
-  --muted: #68707a;
-  --faint: #9aa1a9;
+  --muted: #636b75;
   --accent: #2f7d6d;
+  --accent-text: #2c7667;
   --accent-fg: #ffffff;
   --accent-soft: #e3f1ed;
-  --danger: #c2413a;
+  --danger: #bb3f38;
   --danger-soft: #fbe9e7;
   --warn: #8a5a00;
   --warn-soft: #fdf3dc;
@@ -24,8 +25,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #151619; --surface: #1e2024; --surface-2: #272a2f; --border: #30343a;
-    --text: #e7e9ec; --muted: #a0a7b0; --faint: #6f7680;
-    --accent: #5cbfa8; --accent-fg: #0d1f1b; --accent-soft: #1c3530;
+    --text: #e7e9ec; --muted: #a0a7b0;
+    --accent: #5cbfa8; --accent-text: var(--accent); --accent-fg: #0d1f1b; --accent-soft: #1c3530;
     --danger: #ff8a80; --danger-soft: #3a2221; --warn: #f2c46d; --warn-soft: #352c19; --ok: #5cbfa8;
     --shadow: none;
   }
@@ -33,7 +34,8 @@
 
 * { box-sizing: border-box; }
 body {
-  width: 360px; margin: 0; background: var(--bg); color: var(--text);
+  /* max-width (finding F): a classic vertical scrollbar (Windows, Linux) takes 15 px; never force a horizontal one */
+  width: 360px; max-width: 100%; margin: 0; background: var(--bg); color: var(--text);
   font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -63,7 +65,7 @@ details.card > summary {
 details.card > summary::-webkit-details-marker { display: none; }
 details.card > summary::after {
   content: ""; width: 7px; height: 7px; margin-left: 2px; flex: none;
-  border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
+  border-right: 1.6px solid var(--muted); border-bottom: 1.6px solid var(--muted);
   transform: rotate(-45deg); transition: transform .15s ease;
 }
 details.card[open] > summary::after { transform: rotate(45deg); }
@@ -118,6 +120,8 @@ input[type=text], input[type=url], input[type=password], input[type=number], sel
 input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .advanced > summary { cursor: pointer; font-size: 12px; color: var(--muted); font-weight: 500; }
+.toggle-row.setting { padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; font-weight: 500; color: var(--text); }
+.setting-help { font-size: 12px; color: var(--muted); margin-top: 3px; }
 .actions { display: flex; gap: 8px; }
 .btn {
   font: inherit; font-weight: 600; font-size: 12.5px; padding: 7px 12px; border-radius: var(--radius-sm); cursor: pointer;
@@ -131,6 +135,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .link { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; }
 .link:hover { color: var(--text); text-decoration: underline; }
 
+/* Local CLI bridge preset (docs/design-bridge.md §8) */
+.preset-help { font-size: 12px; color: var(--muted); margin-top: -4px; }
+.preset-help code { font: 11.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--surface-2); color: var(--text); padding: 1px 5px; border-radius: 5px; }
+
 #llmStatus:empty { display: none; }
 #llmStatus { font-size: 12px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--text); }
 #llmStatus.err { background: var(--danger-soft); color: var(--danger); }
@@ -141,21 +149,30 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .chip.warn::before { background: var(--warn); }
 
 /* ---- Session ----------------------------------------------------------------------------- */
-.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.tile { background: var(--surface-2); border-radius: var(--radius-sm); padding: 6px 4px; text-align: center; }
-.tile b { display: block; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.tile span { font-size: 11px; color: var(--muted); }
+/* Five tiles in ~320 px (finding F, V7): columns can never be wider than the card; the cost column gets a little more
+   room; values stay on one line (ellipsis only as a last resort; the full value starts the tooltip); labels may wrap. */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.2fr); gap: 4px; }
+.tile { background: var(--surface-2); border-radius: var(--radius-sm); padding: 6px 2px; text-align: center; min-width: 0; }
+.tile b { display: block; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile span { display: block; font-size: 10.5px; line-height: 1.2; color: var(--muted); white-space: normal; }
 .meta { font-size: 12px; color: var(--muted); }
 #stats { margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #stats:empty { display: none; }
 .bad { color: var(--danger); }
+
+/* Findings J + K: every tile's detail as text (the tooltips are mouse-only); summary at least 24 px tall (WCAG 2.5.8). */
+.tile-details { margin-top: 8px; }
+.tile-details > summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 4px 0; }
+.tile-details ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tile-details li { font-size: 12px; line-height: 1.4; color: var(--text); }
+.tile-details li b { font-weight: 600; }
 
 /* ---- Lists ------------------------------------------------------------------------------- */
 .items { list-style: none; margin: 0; padding: 0; max-height: 176px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
 .items li { display: flex; align-items: center; gap: 8px; padding: 5px 2px; font-size: 12.5px; min-width: 0; }
 .items .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { flex: none; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; }
-.pill.keep { background: var(--accent-soft); color: var(--accent); }
+.pill.keep { background: var(--accent-soft); color: var(--accent-text); }
 .pill.low { background: var(--danger-soft); color: var(--danger); }
 .pill.neutral { background: var(--surface-2); color: var(--muted); font-weight: 500; }
 .empty { font-size: 12.5px; color: var(--muted); padding: 4px 0; }
@@ -167,7 +184,7 @@ table.corr { width: 100%; border-collapse: separate; border-spacing: 0; font-siz
 .corr th, .corr td { padding: 7px 8px; text-align: right; font-weight: 500; }
 .corr thead th { font-size: 12px; color: var(--muted); font-weight: 600; vertical-align: bottom; }
 .corr thead th:first-child, .corr tbody th { text-align: left; }
-.corr .sub { display: block; font-weight: 400; font-size: 11px; color: var(--faint); }
+.corr .sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 .corr tbody th { font-weight: 500; }
 .corr tbody td { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .corr tbody tr > * { border-top: 1px solid var(--border); }
@@ -177,9 +194,12 @@ table.corr { width: 100%; border-collapse: separate; border-spacing: 0; font-siz
 .corr tr.current + tr > * { border-top-color: transparent; }
 .corr tr.current th { font-weight: 650; }
 .corr td.bad { color: var(--danger); }
-.corr td.weak { color: var(--faint); font-weight: 500; }
+.corr td.weak { color: var(--muted); font-weight: 500; }
 .notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .notes:empty { display: none; }
+.corr-copied { font-size: 12px; color: var(--muted); padding: 7px 10px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.corr-copied[hidden] { display: none; }
+.corr-copied b { color: var(--text); font-weight: 600; }
 .notice { font-size: 12px; padding: 7px 10px; border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--warn); }
 .notice[hidden] { display: none; }
 .notes li { font-size: 12px; padding: 7px 10px; border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--warn); }

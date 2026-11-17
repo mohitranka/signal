@@ -37,6 +37,7 @@ export interface Target {
 const toPrediction = (id: string, label: Decision, rec: ClassificationRecord): Prediction => ({
   row: { id, source: 'user-feedback', label, text: '' },
   classification: rec.classification,
+  ...(rec.repeatOf ? { copied: true } : {}),
 });
 
 /** Keep corrections whose classification came from the target model and prompt version; say why the rest were left out. */
@@ -84,6 +85,9 @@ export interface SensitivityRow {
   wronglyHidden: number;
   /** Marked low quality, but this sensitivity would keep or highlight it. */
   missed: number;
+  /** Of those, corrections on verdicts copied from a similar post. Present only when some were (copiedTotal > 0). */
+  copiedWronglyHidden?: number;
+  copiedMissed?: number;
 }
 
 export interface CorrectionReport {
@@ -92,6 +96,8 @@ export interface CorrectionReport {
   lowQualityTotal: number;
   hiddenMeaningful: boolean;
   missedMeaningful: boolean;
+  /** Corrections on verdicts copied from a similar post (included in the totals above). */
+  copiedTotal: number;
 }
 
 export function correctionReport(included: Prediction[]): CorrectionReport {
@@ -101,15 +107,26 @@ export function correctionReport(included: Prediction[]): CorrectionReport {
     if (p.row.label === 'collapse') lowQualityTotal++;
     else keptTotal++;
   }
+  const copied = included.filter((p) => p.copied);
+  const counts = (preds: Prediction[], sensitivity: Sensitivity) => {
+    const c = score(preds, sensitivity).confusion;
+    return { wronglyHidden: c.keep.collapse + c.highlight.collapse, missed: c.collapse.keep + c.collapse.highlight };
+  };
   const rows = SENSITIVITIES.map((sensitivity): SensitivityRow => {
-    const c = score(included, sensitivity).confusion;
-    return {
-      sensitivity,
-      wronglyHidden: c.keep.collapse + c.highlight.collapse,
-      missed: c.collapse.keep + c.collapse.highlight,
-    };
+    const all = counts(included, sensitivity);
+    if (!copied.length) return { sensitivity, ...all };
+    // Same policy and scorer, applied to the copied subset.
+    const cp = counts(copied, sensitivity);
+    return { sensitivity, ...all, copiedWronglyHidden: cp.wronglyHidden, copiedMissed: cp.missed };
   });
-  return { rows, keptTotal, lowQualityTotal, hiddenMeaningful: keptTotal >= MIN_PER_SIDE, missedMeaningful: lowQualityTotal >= MIN_PER_SIDE };
+  return {
+    rows,
+    keptTotal,
+    lowQualityTotal,
+    hiddenMeaningful: keptTotal >= MIN_PER_SIDE,
+    missedMeaningful: lowQualityTotal >= MIN_PER_SIDE,
+    copiedTotal: copied.length,
+  };
 }
 
 /** Stored feedback (new and older entries) as correction inputs, keyed by content fingerprint. */
@@ -124,7 +141,16 @@ export function feedbackToInputs(all: Record<string, FeedbackEntry>): Correction
 export function rowsToInputs(rows: Row[]): CorrectionInput[] {
   return rows.map((r) =>
     r.classification !== undefined
-      ? { id: r.id, label: r.label, record: { classification: r.classification, model: r.model, promptVersion: r.prompt_version } }
+      ? {
+          id: r.id,
+          label: r.label,
+          record: {
+            classification: r.classification,
+            model: r.model,
+            promptVersion: r.prompt_version,
+            ...(r.repeat_of !== undefined ? { repeatOf: { fp: r.repeat_of, similarity: r.repeat_similarity } } : {}),
+          },
+        }
       : { id: r.id, label: r.label },
   );
 }

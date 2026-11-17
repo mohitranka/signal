@@ -51,6 +51,8 @@ interface PostState {
   clickedAt?: number;
   /** How many times this post has been re-judged after its text grew (capped). */
   rejudged?: number;
+  /** "Judge separately" is under way for this fingerprint (the post shows a copied verdict until the answer arrives). */
+  judging?: string;
   visible: boolean;
 }
 
@@ -233,6 +235,8 @@ export class FeedController {
       !(view && isCollapsedView(view)) && st.clickedAt !== undefined && this.now() - st.clickedAt <= USER_EXPAND_WINDOW_MS;
     const epoch = this.epoch;
     const before = { status: st.status, fp: st.fp };
+    // A post showing its own model verdict is re-judged by the model, never given a copy from a similar post.
+    const ownVerdict = !!st.record && !st.record.repeatOf;
     st.status = 'pending'; // grew: busy from here
     const fp = await fingerprint(input);
     if (!this.stillCurrent(el, st, epoch)) return;
@@ -248,7 +252,7 @@ export class FeedController {
     st.input = input;
     st.rejudged = (st.rejudged ?? 0) + 1;
     if (reading) st.keepVisible = true; // the user is reading it: a model verdict must not hide it
-    await this.classifyCurrent(el, st, fp, input, epoch);
+    await this.classifyCurrent(el, st, fp, input, epoch, { noRepeat: ownVerdict });
   }
 
   /** Is another post on this page still waiting for the classification of this text? */
@@ -305,6 +309,7 @@ export class FeedController {
     delete st.fp;
     delete st.input;
     delete st.record;
+    delete st.judging;
     st.revealed = false;
     delete st.keepVisible;
   }
@@ -361,9 +366,17 @@ export class FeedController {
    * request already in flight for it, is reused. A result that arrives after the post's text moved on is dropped.
    * Fails open: on any error, or while requests are paused, the post is left as LinkedIn drew it.
    */
-  private async classifyCurrent(el: HTMLElement, st: PostState, fp: string, input: PostInput, epoch: number): Promise<void> {
+  private async classifyCurrent(
+    el: HTMLElement,
+    st: PostState,
+    fp: string,
+    input: PostInput,
+    epoch: number,
+    opts: { noRepeat?: boolean } = {},
+  ): Promise<void> {
+    const noRepeat = opts.noRepeat === true;
     const known = this.classified.get(fp);
-    if (known) {
+    if (known && !(noRepeat && known.repeatOf)) {
       st.record = known;
       st.status = 'done';
       this.render(el);
@@ -376,20 +389,11 @@ export class FeedController {
       return;
     }
 
-    let pendingResult = this.inflight.get(fp);
-    if (!pendingResult) {
-      pendingResult = this.d
-        .send({ type: 'classify', fp, input })
-        .then((r) => r as ClassifyResult)
-        .catch((): ClassifyResult => ({ ok: false, kind: 'network', message: 'Background unavailable.' }))
-        .finally(() => this.inflight.delete(fp));
-      this.inflight.set(fp, pendingResult);
-    }
-    const result = await pendingResult;
+    const result = await this.request(fp, input, noRepeat);
     if (!this.stillCurrent(el, st, epoch) || st.fp !== fp) return; // the text moved on: drop this result
 
     if (result && result.ok) {
-      const record: ClassificationRecord = { classification: result.classification, model: result.model, promptVersion: result.promptVersion };
+      const record = toRecord(result);
       this.classified.set(fp, record);
       st.record = record;
       st.status = 'done';
@@ -399,6 +403,57 @@ export class FeedController {
       // Fail open: the post stays as LinkedIn rendered it (and loses any verdict for an earlier, shorter text).
       delete st.record;
       st.status = 'failed';
+      this.render(el);
+      if (result && !result.ok && BLOCKING.has(result.kind)) this.blocked = true;
+    }
+  }
+
+  /**
+   * One classify request per text on this page. A request that must not be answered with a copy (noRepeat) is kept
+   * apart from an ordinary one for the same text, so it can neither join nor be joined by it.
+   */
+  private request(fp: string, input: PostInput, noRepeat: boolean): Promise<ClassifyResult> {
+    const key = noRepeat ? `own:${fp}` : fp;
+    let pending = this.inflight.get(key);
+    if (!pending) {
+      pending = this.d
+        .send({ type: 'classify', fp, input, ...(noRepeat ? { noRepeat: true } : {}) })
+        .then((r) => r as ClassifyResult)
+        .catch((): ClassifyResult => ({ ok: false, kind: 'network', message: 'Background unavailable.' }))
+        .finally(() => this.inflight.delete(key));
+      this.inflight.set(key, pending);
+    }
+    return pending;
+  }
+
+  /**
+   * "Judge separately": ask the model about this post itself instead of using the verdict copied from a similar post.
+   * The copied verdict stays on screen until the answer arrives. Revealed / being-read state is kept, so the new verdict
+   * never hides the post behind your back. Identical posts showing the same copied verdict get the answer too. On
+   * failure the post is left as LinkedIn drew it.
+   */
+  private async judgeSeparately(el: HTMLElement): Promise<void> {
+    const st = this.posts.get(el);
+    if (!st || !this.running || st.status !== 'done' || !st.fp || !st.input || !st.record?.repeatOf) return;
+    if (st.judging === st.fp || (st.markFp && this.feedback.has(st.markFp))) return;
+    const { fp, input } = st;
+    const epoch = this.epoch;
+    st.judging = fp;
+    this.render(el);
+    const result = await this.request(fp, input, true);
+    if (!this.stillCurrent(el, st, epoch) || st.fp !== fp) return; // the text moved on: its own classification governs
+    delete st.judging;
+    if (result && result.ok) {
+      const record = toRecord(result);
+      this.classified.set(fp, record);
+      for (const [other, s] of this.posts) {
+        if (other === el || (s.fp === fp && s.record?.repeatOf)) {
+          s.record = record;
+          this.render(other);
+        }
+      }
+    } else {
+      delete st.record; // fail open
       this.render(el);
       if (result && !result.ok && BLOCKING.has(result.kind)) this.blocked = true;
     }
@@ -432,6 +487,7 @@ export class FeedController {
     // so switching back to Active does not hide the post behind your back).
     const visibleBecause = review ? undefined : st.revealed ? 'revealed' : st.keepVisible ? 'expanded' : undefined;
     const keptVisible = r.outcome === 'collapse' && visibleBecause !== undefined;
+    const copied = st.record?.repeatOf;
     return {
       outcome: r.outcome,
       source: 'model',
@@ -441,6 +497,7 @@ export class FeedController {
       review,
       revealed: keptVisible,
       ...(keptVisible ? { visibleBecause } : {}),
+      ...(copied ? { repeat: { similarity: copied.similarity, judging: st.judging === st.fp } } : {}),
     };
   }
 
@@ -455,6 +512,7 @@ export class FeedController {
       keep: () => this.giveFeedback(el, 'keep'),
       lowQuality: () => this.giveFeedback(el, 'collapse'),
       undo: () => this.giveFeedback(el, null),
+      judgeSeparately: () => void this.judgeSeparately(el),
     });
   }
 
@@ -529,6 +587,16 @@ export class FeedController {
       /* background asleep or reloading: keep previous state; feed stays untouched */
     }
   }
+}
+
+/** What the page keeps about a classification: the verdict, what produced it, and whether it was copied. */
+function toRecord(r: Extract<ClassifyResult, { ok: true }>): ClassificationRecord {
+  return {
+    classification: r.classification,
+    model: r.model,
+    promptVersion: r.promptVersion,
+    ...(r.repeatOf ? { repeatOf: r.repeatOf } : {}),
+  };
 }
 
 function defaultObserveVisible(cb: (el: HTMLElement) => void) {

@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { coerceClassification } from '../src/classifier/parse';
+import { FP_PATTERN } from '../src/shared/feedback';
+import { REPEAT_THRESHOLD } from '../src/shared/similarity';
 import type { PostInput } from '../src/shared/types';
 import type { Metrics, Prediction, Row } from '../src/scoring';
 
@@ -25,6 +27,13 @@ export function loadDataset(path: string): Row[] {
         } catch {
           throw new Error(`${path}:${i + 1}: bad classification`);
         }
+      }
+      if (r.family !== undefined && (typeof r.family !== 'string' || !r.family)) throw new Error(`${path}:${i + 1}: bad family`);
+      // A correction on a copied verdict names the post it was copied from; both fields or neither.
+      if (r.repeat_of !== undefined || r.repeat_similarity !== undefined) {
+        if (typeof r.repeat_of !== 'string' || !FP_PATTERN.test(r.repeat_of)) throw new Error(`${path}:${i + 1}: bad repeat_of`);
+        const s = r.repeat_similarity;
+        if (typeof s !== 'number' || !Number.isFinite(s) || s < REPEAT_THRESHOLD || s > 1) throw new Error(`${path}:${i + 1}: bad repeat_similarity`);
       }
       seen.add(r.id);
       rows.push(r);

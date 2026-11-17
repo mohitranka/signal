@@ -7,7 +7,7 @@ import { ClassifyService } from '../src/background/classifyService';
 import { isExtensionPage } from '../src/background/sender';
 import { createHandler } from '../src/background/handlers';
 import { CacheStore, FeedbackStore, SettingsStore, StatsStore } from '../src/background/store';
-import { parseRecord } from '../src/classifier/parse';
+import { UNSAFE_TEXT, parseRecord, printable } from '../src/classifier/parse';
 import { correctionReport, feedbackToInputs, partitionCorrections } from '../src/corrections';
 import { Presenter, shadowRootOf, type View } from '../src/content/presenter';
 import { FP_PATTERN, MAX_FEEDBACK_ENTRIES, isVerdict } from '../src/shared/feedback';
@@ -107,7 +107,7 @@ describe('S3: page scripts cannot reach or drive Signal bars', () => {
     document.body.innerHTML = '<article id="p">post</article>';
     const post = document.getElementById('p')!;
     const lowQuality = vi.fn();
-    return { post, lowQuality, actions: { show() {}, hide() {}, keep() {}, undo() {}, lowQuality } };
+    return { post, lowQuality, actions: { show() {}, hide() {}, keep() {}, undo() {}, lowQuality, judgeSeparately() {} } };
   };
 
   it('uses a closed shadow root: the page sees no shadowRoot, Signal keeps its own reference', () => {
@@ -176,6 +176,15 @@ describe('S5: no control or bidi characters in stored model names and prompt ver
     }
     expect(parseRecord(record(noise(), 'm', 'v1\u001b[2J'))).toBeNull();
     expect(parseRecord(record(noise(), 'openai/gpt-4o-mini:free (2024-07-18)'))).not.toBeNull();
+  });
+
+  it('covers all 12 Unicode bidi formatting characters, including U+061C ARABIC LETTER MARK (security S1)', () => {
+    const bidi = ['\u061c', '\u200e', '\u200f', '\u202a', '\u202b', '\u202c', '\u202d', '\u202e', '\u2066', '\u2067', '\u2068', '\u2069'];
+    for (const c of bidi) {
+      expect(UNSAFE_TEXT.test(c), `U+${c.charCodeAt(0).toString(16)}`).toBe(true);
+      expect(printable(`a${c}b`)).toBe('a?b');
+    }
+    expect(parseRecord(record(noise(), 'gpt\u061cevil'))).toBeNull();
   });
 });
 

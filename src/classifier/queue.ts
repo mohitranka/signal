@@ -68,7 +68,11 @@ export class TaskQueue {
     }
   }
 
-  /** Reject everything queued and abort everything in flight (stale after navigation or settings change). */
+  /**
+   * Reject everything queued and abort everything in flight (stale after navigation or settings change). Aborted
+   * requests are also forgotten for deduplication, so a request made afterwards never attaches to one of them (whose
+   * answer, if it still arrives, was produced under the old settings).
+   */
   cancelAll(): void {
     const queued = this.pending;
     this.pending = [];
@@ -77,6 +81,7 @@ export class TaskQueue {
       e.reject(new AbortedError());
     }
     for (const e of this.byKey.values()) e.ctrl.abort();
+    this.byKey.clear();
   }
 
   private pump(): void {

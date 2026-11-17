@@ -1,0 +1,96 @@
+{
+ "DejaVu Sans Mono": {
+  "measure": {
+   "boxes": [
+    {
+     "box": 1,
+     "overflow": 12,
+     "innerWidthCh": 79.99,
+     "maxCols": 84,
+     "values": []
+    },
+    {
+     "box": 2,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 64,
+     "values": []
+    },
+    {
+     "box": 3,
+     "overflow": 50,
+     "innerWidthCh": 79.99,
+     "maxCols": 89,
+     "values": []
+    },
+    {
+     "box": 4,
+     "overflow": 0,
+     "innerWidthCh": 79.99,
+     "maxCols": 60,
+     "values": []
+    }
+   ],
+   "glyphs": [
+    {
+     "ch": "\u00b7",
+     "code": "U+00B7",
+     "ratio": 1
+    }
+   ],
+   "cell": 7.52578125
+  },
+  "contrastScan": [],
+  "axe": {
+   "violations": [],
+   "incomplete": []
+  }
+ },
+ "Liberation Mono": {
+  "measure": {
+   "boxes": [
+    {
+     "box": 1,
+     "overflow": 12,
+     "innerWidthCh": 79.98,
+     "maxCols": 84,
+     "values": []
+    },
+    {
+     "box": 2,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 64,
+     "values": []
+    },
+    {
+     "box": 3,
+     "overflow": 50,
+     "innerWidthCh": 79.98,
+     "maxCols": 89,
+     "values": []
+    },
+    {
+     "box": 4,
+     "overflow": 0,
+     "innerWidthCh": 79.98,
+     "maxCols": 60,
+     "values": []
+    }
+   ],
+   "glyphs": [
+    {
+     "ch": "\u00b7",
+     "code": "U+00B7",
+     "ratio": 1
+    }
+   ],
+   "cell": 7.5015625
+  },
+  "contrastScan": [],
+  "axe": {
+   "violations": [],
+   "incomplete": []
+  }
+ }
+}

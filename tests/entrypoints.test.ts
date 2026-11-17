@@ -144,4 +144,34 @@ describe('service-worker', () => {
 
     onSuspend();
   });
+
+  it('wires the repeat index: statistics report it and it is flushed on suspend (T7)', async () => {
+    const area = () => {
+      const m: Record<string, unknown> = {};
+      return {
+        m,
+        get: vi.fn(async (k: string) => (k in m ? { [k]: m[k] } : {})),
+        set: vi.fn(async (i: Record<string, unknown>) => void Object.assign(m, i)),
+        remove: vi.fn(async (k: string) => void delete m[k]),
+        setAccessLevel: vi.fn(async () => {}),
+      };
+    };
+    let onMsg: any;
+    let onSuspend: any;
+    const local = area();
+    vi.stubGlobal('chrome', {
+      storage: { local, session: area() },
+      runtime: { id: 'me', getURL: (p: string) => `chrome-extension://me/${p}`, onMessage: { addListener: (f: any) => (onMsg = f) }, onSuspend: { addListener: (f: any) => (onSuspend = f) } },
+      tabs: { query: vi.fn(async () => []), sendMessage: vi.fn(async () => {}) },
+    });
+    vi.resetModules();
+    await import('../src/background/service-worker');
+    const res = vi.fn();
+    onMsg({ type: 'getStats' }, POPUP, res);
+    await flush();
+    expect(res).toHaveBeenCalledWith(expect.objectContaining({ repeatIndexSize: 0 }));
+    onSuspend();
+    await flush();
+    expect(local.set).toHaveBeenCalledWith(expect.objectContaining({ 'repeats:v3': { key: expect.any(String), entries: {} } }));
+  });
 });

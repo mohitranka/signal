@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Signal · repeats · feed mockups</title>
+<style>
+  body { margin:0; background:#f4f2ee; font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; color:#1f1f1f; }
+  @media (prefers-color-scheme: dark){ body{ background:#000; color:#e8e8e8 } .post{ background:#1b1f23 !important; border-color:#38434f !important } .meta-line{color:#a9b0b8 !important} .frame h3{color:#e7e9ec} .frame p.cap{color:#a9b0b8} .tag{background:#2a2f34 !important;color:#a9b0b8 !important} .tip{background:#e7e9ec !important;color:#1c1f23 !important} }
+  .page { display:grid; grid-template-columns: 600px 600px; gap:28px 36px; padding:28px 36px; width:max-content; }
+  .frame h3 { margin:0 0 2px; font-size:14px; font-weight:650; }
+  .frame p.cap { margin:0 0 10px; font-size:12.5px; color:#5e6670; max-width:580px; }
+  .tag { display:inline-block; font-size:11px; font-weight:600; background:#e8eaed; color:#5e6670; border-radius:999px; padding:1px 8px; margin-right:6px; }
+  .tag.new { background:#e3f1ed; color:#2f7d6d; }
+  .post { background:#fff; border:1px solid #dfdeda; border-radius:8px; padding:12px 16px 14px; }
+  .post[data-signal-hidden] { display:none; }
+  .post[data-signal="highlight"] { box-shadow: inset 3px 0 0 #2f7d6d; }
+  .author { display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+  .avatar { width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#9db4c0,#5c6b73); flex:none; }
+  .name { font-weight:600; font-size:14px; } .meta-line { font-size:12px; color:#666; }
+  .body { font-size:14px; }
+  .tipwrap { position:relative; height:0; }
+  .tip { position:absolute; right:6px; top:-2px; max-width:360px; background:#1c1f23; color:#fff; font-size:12px; padding:6px 9px; border-radius:6px; z-index:2; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+</style></head>
+<body><div class="page" id="page"></div>
+<script>
+const CSS = "\n:host { all: initial; display: block; }\n.bar {\n  --fg: #5e6670; --strong: #1c1f23; --surface: #ffffff; --border: #e0e3e7; --hover: #f1f3f5;\n  --accent: #2f7d6d; --danger: #c2413a; --neutral: #a4abb3; --focus: #0a66c2;\n  font: 12.5px/1.45 -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif; color: var(--fg);\n  display: flex; align-items: center; gap: 10px; padding: 6px 4px;\n}\n.label { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: var(--strong); white-space: nowrap; }\n.label::before { content: \"\"; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--neutral)); flex: none; }\n.reason { flex: 1 1 auto; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }\nbutton {\n  all: unset; cursor: pointer; white-space: nowrap; font-weight: 600; font-size: 12px; color: var(--strong);\n  padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);\n}\nbutton:first-of-type { margin-left: auto; }\nbutton:hover { background: var(--hover); }\nbutton:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }\n.bar.collapsed { --dot: var(--danger); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 10px 14px; margin: 0 0 8px; }\n.review.highlight { --dot: var(--accent); }\n.review.collapse { --dot: var(--danger); }\n.bar.quiet { justify-content: flex-end; padding: 0 4px 4px; }\n.bar.quiet button { opacity: .55; font-weight: 500; font-size: 11.5px; padding: 2px 10px; color: var(--fg); transition: opacity .12s; }\n.bar.quiet button:hover, .bar.quiet button:focus-visible { opacity: 1; color: var(--strong); }\n@media (prefers-color-scheme: dark) {\n  .bar { --fg: #a9b0b8; --strong: #e7e9ec; --surface: #1e2226; --border: #363b41; --hover: #2a2f34; --accent: #5cbfa8; --danger: #ff8a80; --neutral: #6f7680; --focus: #70b5f9; }\n}\n";
+/* ---- PROPOSED additions to presenter CSS (new in this feature) ---- */
+const NEW_CSS = `
+.bar.has-note { flex-wrap: wrap; row-gap: 2px; }
+.bar.has-note .reason { flex: 1 1 0; }
+.bar .note { flex: 1 0 100%; order: 10; font-size: 11.5px; color: var(--fg); padding-left: 15px; }
+.bar .note::before { content: "≈"; font-weight: 700; margin-right: 5px; margin-left: -12px; }
+.bar .note .link { all: unset; cursor: pointer; font-weight: 600; color: var(--strong); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 2px; }
+.bar .note .link:hover { text-decoration-color: currentColor; }
+.bar .note .link:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-radius: 2px; }
+.bar .note .busy { font-weight: 600; }
+.bar.quiet.has-note { flex-wrap: nowrap; }
+.bar.quiet .note { flex: 1 1 auto; order: 0; padding-left: 12px; opacity: .7; font-size: 11px; }
+.bar.quiet .note:hover, .bar.quiet .note:focus-within { opacity: 1; }
+`;
+const POSTS = {
+  thrilled: ["Priya Raman","Head of Growth at Northwind · 2h",
+   "🎉 I'm thrilled to announce that I've joined Northwind as Head of Growth! After 6 amazing years at Contoso, it was time for a new chapter. I'm so grateful to everyone who supported me along the way. Huge thanks to my mentors, my team and my family. The best is yet to come. Agree? ♻️ Repost if this inspires you and follow me for more lessons on growth, leadership and hustle 🚀"],
+  lessons: ["Marco Diaz","Founder · 5h",
+   "I hired 12 people last year. Here are 7 lessons nobody tells you about hiring 👇 1. Attitude beats skills. 2. Hire slow, fire fast. 3. Culture is everything. 4. Trust your gut. 5. Pay for talent. 6. Never stop learning. 7. Your people are your product. Which one resonates most with you? Comment below and repost to help your network ♻️"],
+};
+function post(key, attrs={}) {
+  const [n,m,t] = POSTS[key];
+  const d = document.createElement('div'); d.className='post';
+  for (const [k,v] of Object.entries(attrs)) d.setAttribute(k,v);
+  d.innerHTML = `<div class="author"><div class="avatar"></div><div><div class="name"></div><div class="meta-line"></div></div></div><div class="body"></div>`;
+  d.querySelector('.name').textContent=n; d.querySelector('.meta-line').textContent=m; d.querySelector('.body').textContent=t;
+  return d;
+}
+function el(tag, cls, text){ const n=document.createElement(tag); if(cls) n.className=cls; if(text!==undefined) n.textContent=text; return n; }
+function btn(label, cls){ const b=el('button',cls,label); b.type='button'; return b; }
+function note(state='idle', sim=92){
+  const n = el('span','note','Same template as a post judged earlier');
+  n.title = `Verdict copied from a post that is ${sim}% similar. No model call was made for this post.`;
+  n.append(' · ');
+  if (state==='idle') n.append(btn('Judge separately','link'));
+  else n.append(el('span','busy','Judging…'));
+  return n;
+}
+/** Build a bar exactly like Presenter.buildBar, plus the proposed note. */
+function bar(kind, opts={}) {
+  const host = document.createElement('div'); host.setAttribute('data-signal-bar','');
+  const root = host.attachShadow({mode:'open'});
+  const s = document.createElement('style'); s.textContent = CSS + NEW_CSS; root.append(s);
+  const b = el('div','bar'); root.append(b);
+  const reason = (t, withNote) => { b.append(el('span','reason',t)); if(withNote){ b.classList.add('has-note'); b.append(note(opts.noteState, opts.sim)); } };
+  const r = opts.reason ?? 'Engagement bait: asks readers to repost and follow, with a generic announcement.';
+  const copied = opts.copied !== false;
+  if (kind==='collapsed') { b.classList.add('collapsed'); b.append(el('span','label','Post collapsed')); reason(r, copied); b.append(btn('Show post'), btn('Worth keeping')); }
+  if (kind==='revealed') { b.append(el('span','label','Collapsed by Signal')); reason(r, copied); b.append(btn('Hide again'), btn('Worth keeping')); }
+  if (kind==='expanded') { b.append(el('span','label','Signal would collapse this')); reason(r, copied); b.append(btn('Hide'), btn('Worth keeping')); }
+  if (kind==='review') { b.classList.add('review','collapse'); b.append(el('span','label',`Signal: would collapse ${opts.pct ?? 93}%`)); reason(r, copied); b.append(btn('Worth keeping')); }
+  if (kind==='quiet') { b.classList.add('quiet'); if (copied) { b.classList.add('has-note'); b.append(note(opts.noteState, opts.sim)); } const q=btn('Low quality'); b.append(q); }
+  if (kind==='marked') { b.append(el('span','label','Marked low quality')); b.append(btn('Hide again'), btn('Undo')); }
+  return host;
+}
+function frame(title, tags, cap, nodes){
+  const f=el('div','frame'); const h=el('h3'); for(const t of tags){ h.append(el('span','tag'+(t==='new'||t==='changed'?' new':''),t)); } h.append(title);
+  f.append(h, el('p','cap',cap)); for(const n of nodes) f.append(n); document.getElementById('page').append(f);
+}
+function tip(text){ const w=el('div','tipwrap'); w.append(el('div','tip',text)); return w; }
+
+frame('Copied collapse, collapsed', ['Active','changed'],
+ 'The post matched one the model collapsed earlier (name and numbers differ). No model call. The note is a second row of the bar (the reason stays clamped to 2 lines); hovering it shows the similarity.',
+ [bar('collapsed'), post('thrilled',{'data-signal-hidden':''})]);
+frame('After "Show post"', ['Active','changed'],
+ 'Revealed stays revealed: no later verdict, copied or fresh, hides it again. Only "Hide again" does.',
+ [bar('revealed'), post('thrilled')]);
+frame('"Judge separately" in progress', ['Active','new'],
+ 'One model call for this post only. The copied verdict stays on screen until the answer arrives; the action turns into "Judging…".',
+ [bar('collapsed',{noteState:'busy'}), post('thrilled',{'data-signal-hidden':''})]);
+frame('After "Judge separately": own verdict', ['Active','changed'],
+ 'The note and action disappear. If the model now says collapse, the normal bar (no note). If it says keep, the post is left untouched like any kept post. A failure also leaves it untouched.',
+ [bar('collapsed',{copied:false, reason:'Generic announcement with engagement bait ("Agree? Repost").'}), post('thrilled',{'data-signal-hidden':''})]);
+frame('Review mode: copied "would collapse"', ['Review','changed'],
+ 'Annotates only, hides nothing. The note tells you this verdict is copied, so you can check whether the template verdict fits this post.',
+ [bar('review'), post('lessons')]);
+frame('Review mode: copied keep (quiet row)', ['Review','changed'],
+ 'Kept posts normally get just the faint "Low quality" button. A copied keep adds the same faint note on the left. Tooltip on the button (shown) includes the copy.',
+ [bar('quiet',{copied:true, sim:88}), tip('Kept (model 90% confident): Shares concrete hiring lessons · Same template as a post judged earlier (88% similar)'), post('lessons')]);
+frame('Expanded to read, copied collapse', ['Active','changed'],
+ 'You clicked "…more" and are reading: a copied collapse never hides it (same rule as a fresh verdict).',
+ [bar('expanded'), post('lessons')]);
+frame('Marked post: unchanged', ['Active','Review'],
+ 'Your mark governs. No note and no "Judge separately": the verdict behind it, copied or not, does not matter while the mark stands.',
+ [bar('marked'), post('lessons',{'data-signal-hidden':''})]);
+</script></body></html>

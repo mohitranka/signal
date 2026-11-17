@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["chrome", "node"]
   },
-  "include": ["src", "tests", "eval", "build.mjs"]
+  "include": ["src", "tests", "eval", "scripts", "bridge", "build.mjs"]
 }

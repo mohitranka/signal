@@ -1,0 +1,24 @@
+== light
+  keyboard: Tab reaches «SUMMARY Details» (visible focus ring: True); Enter opens it: True
+  cost tile as read by a screen reader: ['under 1 cent']
+  accessibility tree: summary role «DisclosureTriangle», expanded=True; detail lines exposed: 5/5
+    · 41 posts · 41 HTTP requests · avg latency 4,146 ms
+    · 12 · 53 entries stored
+    · 9 copied from a similar post · no model call · 41 stored
+    · 35,000 in · 3,000 out
+    · $0.0070 from your configured prices
+  Details summary size in CSS px (WCAG 2.5.8 wants >= 24 tall): [291, 25.4]
+  forced colours: {'li': 'rgb(0, 0, 0)', 'summary': 'rgb(0, 0, 159)', 'bg': 'rgb(255, 255, 255)'}
+  zoom 200 %: {'overflow': 0, 'cut': []}
+== dark
+  keyboard: Tab reaches «SUMMARY Details» (visible focus ring: True); Enter opens it: True
+  cost tile as read by a screen reader: ['under 1 cent']
+  accessibility tree: summary role «DisclosureTriangle», expanded=True; detail lines exposed: 5/5
+    · 41 posts · 41 HTTP requests · avg latency 4,146 ms
+    · 12 · 53 entries stored
+    · 9 copied from a similar post · no model call · 41 stored
+    · 35,000 in · 3,000 out
+    · $0.0070 from your configured prices
+  Details summary size in CSS px (WCAG 2.5.8 wants >= 24 tall): [291, 25.4]
+  forced colours: {'li': 'rgb(255, 255, 255)', 'summary': 'rgb(255, 255, 0)', 'bg': 'rgb(0, 0, 0)'}
+  zoom 200 %: {'overflow': 0, 'cut': []}

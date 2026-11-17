@@ -1,0 +1,67 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Signal bridge · security B3 · terminal mockup</title>
+<style>
+body{margin:0;background:#e9ebee;font:13px/1.5 system-ui;padding:20px;width:max-content}
+h3{margin:16px 0 6px;font-size:13px;color:#333}
+/* an 80-column terminal: 80ch wide content box, so any line over 80 columns would visibly overflow */
+.t{background:#15171a;color:#d7dce2;border-radius:10px;padding:14px 18px;font:12.5px/1.55 'DejaVu Sans Mono',ui-monospace,Menlo,monospace;white-space:pre;width:80ch;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.ok{color:#5cbfa8}.bad{color:#ff8a80}.dim{color:#7d8590}.warn{color:#f2c46d}.b{color:#fff;font-weight:700}
+.new{position:relative}.new::before{content:"";position:absolute;left:-12px;top:.1em;bottom:.1em;width:3px;border-radius:2px;background:#f2c46d}
+@media (forced-colors: active){.new::before{background:CanvasText}}
+</style>
+<main><h1 style="font-size:15px;margin:0 0 4px">Signal bridge · security B3 · terminal output</h1>
+<p style="margin:0 0 6px;color:#444">Marked with a yellow bar on the left: new or changed lines (mockup only). Versions, paths and times are illustrative.</p>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">1 · Start (Claude Code): nothing kept on disk; the check passes</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+  claude 2.1.4 ....................... <span class="ok">found</span>
+    ~/.local/bin/claude → ~/.local/share/claude/versions/2.1.4
+  required flags ..................... <span class="ok">ok</span>
+  logged in (test classification) .... <span class="ok">ok</span>  <span class="dim">3.9 s · subscription</span>
+<span class="new">  post text not kept on disk ......... <span class="ok">ok</span></span>
+  tools off (canary: read/list/run) .. <span class="ok">passed</span>
+<span class="ok">Listening</span> on <span class="b">http://127.0.0.1:8791/v1</span>
+  <span class="dim">…</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">2 · Start (Codex): its history file keeps the post; refuses, explains the opt-in</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli codex --model gpt-5
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+  codex 0.58.0 ....................... <span class="ok">found</span>
+    ~/.npm-global/bin/codex
+    → ~/.npm-global/lib/node_modules/@openai/codex/bin/codex.js
+    runs with /usr/bin/node
+  required flags ..................... <span class="ok">ok</span>
+  logged in (test classification) .... <span class="ok">ok</span>  <span class="dim">6.2 s · subscription</span>
+<span class="new">  post text not kept on disk ......... <span class="bad">FAILED</span></span>
+<span class="new">    found in ~/.codex/history.jsonl</span>
+<span class="new"><span class="bad">Not starting.</span> codex keeps the text of each post it classifies, and the</span>
+<span class="new">bridge cannot remove it safely. To accept that (the files stay in</span>
+<span class="new">~/.codex, readable only by you), start with --keep-session-files.</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">3 · Start (Codex) with --keep-session-files: accepted knowingly, said on every start</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli codex --model gpt-5 --keep-session-files
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+  codex 0.58.0 ....................... <span class="ok">found</span>
+  <span class="dim">…</span>
+  logged in (test classification) .... <span class="ok">ok</span>  <span class="dim">6.0 s · subscription</span>
+<span class="new">  post text not kept on disk ......... <span class="warn">kept (--keep-session-files)</span></span>
+<span class="new">    each post stays in ~/.codex/history.jsonl (only you can read it)</span>
+  tools off (canary: read/list/run) .. <span class="ok">passed</span>
+<span class="ok">Listening</span> on <span class="b">http://127.0.0.1:8791/v1</span>
+  <span class="dim">…</span></div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">4 · Start (Claude Code): a version without --no-session-persistence is refused</h2>
+<div class="t"><span class="dim">$</span> npm run bridge -- --cli claude
+<span class="b">Signal bridge</span> <span class="dim">· local CLI bridge · classification only</span>
+  claude 1.0.98 ...................... <span class="ok">found</span>
+    ~/.local/bin/claude → ~/.local/share/claude/versions/1.0.98
+<span class="new">  required flags ..................... <span class="bad">missing --no-session-persistence</span></span>
+<span class="new"><span class="bad">Not starting.</span> This claude version lacks a flag the bridge needs</span>
+<span class="new">(to switch off its tools or its session files).</span>
+Update it (claude update) and try again.</div>
+<h2 style="font-size:13px;margin:16px 0 6px;color:#333">5 · Running: after a CLI update the re-check includes the new line</h2>
+<div class="t"><span class="dim">12:40:02</span>  <span class="warn">claude changed (update?) · pausing, re-checking</span>
+  claude 2.1.5 ....................... <span class="ok">found</span>
+    ~/.local/bin/claude → ~/.local/share/claude/versions/2.1.5
+  required flags ..................... <span class="ok">ok</span>
+  logged in (test classification) .... <span class="ok">ok</span>  <span class="dim">4.1 s · subscription</span>
+<span class="new">  post text not kept on disk ......... <span class="ok">ok</span></span>
+  tools off (canary: read/list/run) .. <span class="ok">passed</span>
+<span class="dim">12:40:11</span>  <span class="ok">re-check passed · serving with claude 2.1.5</span></div>
+</main>
